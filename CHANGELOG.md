@@ -11,6 +11,11 @@ All notable project changes are documented in this file.
 - Established the convention that newly added or modified functions require
   purpose comments, with additional explanation for complex logic.
 
+### Fixed
+
+- Added the MSVC `/FS` compiler option to every build configuration, preventing
+  parallel compiler processes from failing with C1041 while writing `vc143.pdb`.
+
 ## [2026-08-19]
 
 ### Added
