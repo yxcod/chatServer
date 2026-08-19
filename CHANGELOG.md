@@ -4,6 +4,13 @@ All notable project changes are documented in this file.
 
 ## [Unreleased]
 
+### Documentation
+
+- Added Chinese usage comments for every `PooledConnection` member function,
+  including ownership transfer, connection access, and automatic pool return.
+- Established the convention that newly added or modified functions require
+  purpose comments, with additional explanation for complex logic.
+
 ## [2026-08-19]
 
 ### Added
