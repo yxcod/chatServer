@@ -53,6 +53,9 @@
     <ClInclude Include="Logger.h">
       <Filter>源文件\Tool</Filter>
     </ClInclude>
+    <ClInclude Include="DatabaseConnectionPool.h">
+      <Filter>源文件\Tool</Filter>
+    </ClInclude>
     <ClInclude Include="EncryptUtil.h">
       <Filter>源文件\Tool</Filter>
     </ClInclude>
@@ -209,6 +212,9 @@
       <Filter>源文件\Tool</Filter>
     </ClCompile>
     <ClCompile Include="Logger.cpp">
+      <Filter>源文件\Tool</Filter>
+    </ClCompile>
+    <ClCompile Include="DatabaseConnectionPool.cpp">
       <Filter>源文件\Tool</Filter>
     </ClCompile>
     <ClCompile Include="ChatManageController.cpp">

@@ -1,6 +1,4 @@
 #include "Logger.h"
-#include <cstdlib>
-#include <stdexcept>
 
 Logger& Logger::GetInstance()
 {
@@ -8,24 +6,9 @@ Logger& Logger::GetInstance()
     return instance;
 }
 
-std::unique_ptr<sql::Connection> Logger::createConnection() const
+PooledConnection Logger::createConnection() const
 {
-    const char* host = std::getenv("CHATSERVER_DB_HOST");
-    const char* user = std::getenv("CHATSERVER_DB_USER");
-    const char* password = std::getenv("CHATSERVER_DB_PASSWORD");
-    const char* schema = std::getenv("CHATSERVER_DB_SCHEMA");
-    if (!host || !user || !password || !schema)
-    {
-        throw std::runtime_error(
-            "Missing database configuration. Set CHATSERVER_DB_HOST, "
-            "CHATSERVER_DB_USER, CHATSERVER_DB_PASSWORD and CHATSERVER_DB_SCHEMA.");
-    }
-
-    sql::mysql::MySQL_Driver* drive = sql::mysql::get_driver_instance();
-    std::unique_ptr<sql::Connection> con(
-        drive->connect(host, user, password));
-    con->setSchema(schema);
-    return con;
+    return DatabaseConnectionPool::instance().acquire();
 }
 
 Logger::Logger()
@@ -65,7 +48,7 @@ sql::Connection* Logger::getConnection() const
 // 初始化数据库
 void Logger::initMysSql()
 {
-    auto con = createConnection();
+    DatabaseConnectionPool::instance().initialize();
 }
 
 // 初始化服务器

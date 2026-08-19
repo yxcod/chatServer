@@ -12,6 +12,11 @@ Set these environment variables before starting the server:
 - `CHATSERVER_DB_SCHEMA`
 - `CHATSERVER_JWT_SECRET`
 
+Optional database pool settings:
+
+- `CHATSERVER_DB_POOL_SIZE` (default: `10`)
+- `CHATSERVER_DB_ACQUIRE_TIMEOUT_SECONDS` (default: `10`)
+
 See `.env.example` for local development placeholders. Never commit real credentials.
 
 ## Build

@@ -130,6 +130,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="ChatDao.cpp" />
+    <ClCompile Include="DatabaseConnectionPool.cpp" />
     <ClCompile Include="ChatManageController.cpp" />
     <ClCompile Include="ChatRecoedModel.cpp" />
     <ClCompile Include="ChatServer.cpp" />
@@ -148,14 +149,18 @@
     <ClCompile Include="GroupService.cpp" />
     <ClCompile Include="HeartbeatManager.cpp" />
     <ClCompile Include="JwtTokenUtil.cpp" />
-    <ClCompile Include="Logger.cpp" />
+    <ClCompile Include="Logger.cpp">
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="LoginDao.cpp" />
     <ClCompile Include="LoginModel.cpp" />
     <ClCompile Include="ProxyController.cpp" />
     <ClCompile Include="RangeUtils.cpp" />
     <ClCompile Include="UserInfoDao.cpp" />
     <ClCompile Include="UserInfoService.cpp" />
-    <ClCompile Include="UserLoginService.cpp" />
+    <ClCompile Include="UserLoginService.cpp">
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="UserModel.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -165,6 +170,7 @@
     <ClInclude Include="ChatRecoedModel.h" />
     <ClInclude Include="ChatService.h" />
     <ClInclude Include="ConversationModel.h" />
+    <ClInclude Include="DatabaseConnectionPool.h" />
     <ClInclude Include="EncryptUtil.h" />
     <ClInclude Include="FilesController.h" />
     <ClInclude Include="FileService.h" />
