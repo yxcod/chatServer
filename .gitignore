@@ -1,0 +1,44 @@
+# Visual Studio and build outputs
+.vs/
+ChatServer/x64/
+x64/
+Debug/
+Release/
+*.obj
+*.pdb
+*.ilk
+*.idb
+*.iobj
+*.ipdb
+*.tlog
+*.log
+*.exe
+*.dll
+*.user
+
+# Runtime/user-generated data
+uploads/
+imageData/
+ImageData/
+videoData/
+fileData/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+config.json
+
+# Bare-repository metadata left in the source directory
+/HEAD
+/config
+/description
+/hooks/
+/info/
+/objects/
+/refs/
+
+# OS/editor files
+Desktop.ini
+.DS_Store
+*.swp

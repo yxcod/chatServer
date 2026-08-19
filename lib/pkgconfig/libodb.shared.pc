@@ -1,0 +1,10 @@
+Name: libodb
+Version: 2.5.0
+Description: Common ODB runtime library
+URL: https://www.codesynthesis.com/products/odb/
+Cflags: -I${pcfiledir}\\..\\..\\include -DLIBODB_SHARED
+Libs: -L${pcfiledir}\\.. -lodb
+
+build2.metadata = 1
+
+cc.type = cxx

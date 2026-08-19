@@ -1,0 +1,236 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="源文件">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="资源文件">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="源文件\Model">
+      <UniqueIdentifier>{a2a963c1-9e09-4a8d-a740-6f22994211ec}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="源文件\Control">
+      <UniqueIdentifier>{7ba88cb5-8526-41e2-b2b3-0c29a93358bb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="源文件\main">
+      <UniqueIdentifier>{b7efbe8c-ebb5-40b0-945c-4fa8fcf92ded}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="源文件\Mapper">
+      <UniqueIdentifier>{83e68ae0-d02b-471a-a574-130d3704056b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="源文件\Service">
+      <UniqueIdentifier>{b83599fc-f73f-4b3c-bc52-59359d955537}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="源文件\Tool">
+      <UniqueIdentifier>{589df1b2-9f5d-4eb3-9bf7-e7b70b4e0c24}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="源文件\Control\服务代理">
+      <UniqueIdentifier>{370d2957-39a0-4029-9f28-9524befe7f97}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="UserModel.h">
+      <Filter>源文件\Model</Filter>
+    </ClInclude>
+    <ClInclude Include="LoginDao.h">
+      <Filter>源文件\Mapper</Filter>
+    </ClInclude>
+    <ClInclude Include="FriendRelationModel.h">
+      <Filter>源文件\Model</Filter>
+    </ClInclude>
+    <ClInclude Include="ChatRecoedModel.h">
+      <Filter>源文件\Model</Filter>
+    </ClInclude>
+    <ClInclude Include="LoginModel.h">
+      <Filter>源文件\Model</Filter>
+    </ClInclude>
+    <ClInclude Include="UserLoginService.h">
+      <Filter>源文件\Service</Filter>
+    </ClInclude>
+    <ClInclude Include="Logger.h">
+      <Filter>源文件\Tool</Filter>
+    </ClInclude>
+    <ClInclude Include="EncryptUtil.h">
+      <Filter>源文件\Tool</Filter>
+    </ClInclude>
+    <ClInclude Include="JwtTokenUtil.h">
+      <Filter>源文件\Tool</Filter>
+    </ClInclude>
+    <ClInclude Include="ProxyController.h">
+      <Filter>源文件\Control\服务代理</Filter>
+    </ClInclude>
+    <ClInclude Include="UserController.h">
+      <Filter>源文件\Control</Filter>
+    </ClInclude>
+    <ClInclude Include="UserInfoDao.h">
+      <Filter>源文件\Mapper</Filter>
+    </ClInclude>
+    <ClInclude Include="FriendRelationDao.h">
+      <Filter>源文件\Mapper</Filter>
+    </ClInclude>
+    <ClInclude Include="FriendRelationService.h">
+      <Filter>源文件\Service</Filter>
+    </ClInclude>
+    <ClInclude Include="UserInfoService.h">
+      <Filter>源文件\Service</Filter>
+    </ClInclude>
+    <ClInclude Include="ImageControl.h">
+      <Filter>源文件\Control</Filter>
+    </ClInclude>
+    <ClInclude Include="RangeUtils.h">
+      <Filter>源文件\Tool</Filter>
+    </ClInclude>
+    <ClInclude Include="FilesController.h">
+      <Filter>源文件\Control</Filter>
+    </ClInclude>
+    <ClInclude Include="FileService.h">
+      <Filter>源文件\Service</Filter>
+    </ClInclude>
+    <ClInclude Include="FriendController.h">
+      <Filter>源文件\Control</Filter>
+    </ClInclude>
+    <ClInclude Include="ConversationModel.h">
+      <Filter>源文件\Model</Filter>
+    </ClInclude>
+    <ClInclude Include="ChatControl.h">
+      <Filter>源文件\Control</Filter>
+    </ClInclude>
+    <ClInclude Include="ChatService.h">
+      <Filter>源文件\Service</Filter>
+    </ClInclude>
+    <ClInclude Include="ChatDao.h">
+      <Filter>源文件\Mapper</Filter>
+    </ClInclude>
+    <ClInclude Include="ChatManageController.h">
+      <Filter>源文件\Control</Filter>
+    </ClInclude>
+    <ClInclude Include="HeartbeatManager.h">
+      <Filter>源文件\Tool</Filter>
+    </ClInclude>
+    <ClInclude Include="GroupChatModel.h">
+      <Filter>源文件\Model</Filter>
+    </ClInclude>
+    <ClInclude Include="GroupMemberModel.h">
+      <Filter>源文件\Model</Filter>
+    </ClInclude>
+    <ClInclude Include="GroupMessageModel.h">
+      <Filter>源文件\Model</Filter>
+    </ClInclude>
+    <ClInclude Include="GroupMsgReadModel.h">
+      <Filter>源文件\Model</Filter>
+    </ClInclude>
+    <ClInclude Include="GroupChatDao.h">
+      <Filter>源文件\Mapper</Filter>
+    </ClInclude>
+    <ClInclude Include="GroupMemberDao.h">
+      <Filter>源文件\Mapper</Filter>
+    </ClInclude>
+    <ClInclude Include="GroupMessageDao.h">
+      <Filter>源文件\Mapper</Filter>
+    </ClInclude>
+    <ClInclude Include="GroupMsgReadDao.h">
+      <Filter>源文件\Mapper</Filter>
+    </ClInclude>
+    <ClInclude Include="GroupController.h">
+      <Filter>源文件\Control</Filter>
+    </ClInclude>
+    <ClInclude Include="GroupService.h">
+      <Filter>源文件\Service</Filter>
+    </ClInclude>
+    <ClInclude Include="GroupConversationModel.h">
+      <Filter>源文件\Model</Filter>
+    </ClInclude>
+    <ClInclude Include="GroupConversationDao.h">
+      <Filter>源文件\Mapper</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="LoginDao.cpp">
+      <Filter>源文件\Mapper</Filter>
+    </ClCompile>
+    <ClCompile Include="UserModel.cpp">
+      <Filter>源文件\Model</Filter>
+    </ClCompile>
+    <ClCompile Include="FriendRelationModel.cpp">
+      <Filter>源文件\Model</Filter>
+    </ClCompile>
+    <ClCompile Include="ChatServer.cpp">
+      <Filter>源文件\main</Filter>
+    </ClCompile>
+    <ClCompile Include="ChatRecoedModel.cpp">
+      <Filter>源文件\Model</Filter>
+    </ClCompile>
+    <ClCompile Include="LoginModel.cpp">
+      <Filter>源文件\Model</Filter>
+    </ClCompile>
+    <ClCompile Include="UserLoginService.cpp">
+      <Filter>源文件\Service</Filter>
+    </ClCompile>
+    <ClCompile Include="EncryptUtil.cpp">
+      <Filter>源文件\Tool</Filter>
+    </ClCompile>
+    <ClCompile Include="JwtTokenUtil.cpp">
+      <Filter>源文件\Tool</Filter>
+    </ClCompile>
+    <ClCompile Include="ProxyController.cpp">
+      <Filter>源文件\Control\服务代理</Filter>
+    </ClCompile>
+    <ClCompile Include="UserInfoDao.cpp">
+      <Filter>源文件\Mapper</Filter>
+    </ClCompile>
+    <ClCompile Include="FriendRelationDao.cpp">
+      <Filter>源文件\Mapper</Filter>
+    </ClCompile>
+    <ClCompile Include="FriendRelationService.cpp">
+      <Filter>源文件\Service</Filter>
+    </ClCompile>
+    <ClCompile Include="UserInfoService.cpp">
+      <Filter>源文件\Service</Filter>
+    </ClCompile>
+    <ClCompile Include="RangeUtils.cpp">
+      <Filter>源文件\Tool</Filter>
+    </ClCompile>
+    <ClCompile Include="FilesController.cpp">
+      <Filter>源文件\Control</Filter>
+    </ClCompile>
+    <ClCompile Include="FileService.cpp">
+      <Filter>源文件\Service</Filter>
+    </ClCompile>
+    <ClCompile Include="ChatService.cpp">
+      <Filter>源文件\Service</Filter>
+    </ClCompile>
+    <ClCompile Include="ChatDao.cpp">
+      <Filter>源文件\Mapper</Filter>
+    </ClCompile>
+    <ClCompile Include="HeartbeatManager.cpp">
+      <Filter>源文件\Tool</Filter>
+    </ClCompile>
+    <ClCompile Include="Logger.cpp">
+      <Filter>源文件\Tool</Filter>
+    </ClCompile>
+    <ClCompile Include="ChatManageController.cpp">
+      <Filter>源文件\Control</Filter>
+    </ClCompile>
+    <ClCompile Include="GroupChatDao.cpp">
+      <Filter>源文件\Mapper</Filter>
+    </ClCompile>
+    <ClCompile Include="GroupMemberDao.cpp">
+      <Filter>源文件\Mapper</Filter>
+    </ClCompile>
+    <ClCompile Include="GroupMessageDao.cpp">
+      <Filter>源文件\Mapper</Filter>
+    </ClCompile>
+    <ClCompile Include="GroupMsgReadDao.cpp">
+      <Filter>源文件\Mapper</Filter>
+    </ClCompile>
+    <ClCompile Include="GroupService.cpp">
+      <Filter>源文件\Service</Filter>
+    </ClCompile>
+    <ClCompile Include="GroupConversationDao.cpp">
+      <Filter>源文件\Mapper</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>
