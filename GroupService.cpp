@@ -666,11 +666,14 @@ std::string GroupService::groupMessageRead(const Json::Value& jsonMsg)
 	//已读消息的用户ID
 	std::string sender = jsonMsg["sender"].asString();
 	uint64_t msgId = jsonMsg["msgId"].asUInt64();
+	uint64_t readTime = Logger::GetInstance().getcurrentTime();
 	groupMsgReadModel.setUserId(sender);
 	groupMsgReadModel.setMsgId(msgId);
+	groupMsgReadModel.setReadTime(readTime);
 	if (groupMsgReadDao.markRead(groupMsgReadModel) > 0)
 	{
 		response["code"] = 100;
+		response["readTime"] = Json::UInt64(readTime);
 	}
 	Json::StreamWriterBuilder wbuilder;
 	std::string forwardStr = Json::writeString(wbuilder, response);

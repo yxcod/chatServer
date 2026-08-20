@@ -15,8 +15,12 @@ bool GroupMsgReadDao::markRead(const GroupMsgReadModel &model)
                 "VALUES (?, ?, ?) "
                 "ON DUPLICATE KEY UPDATE readTime = VALUES(readTime)"));
 
-        // 使用 Logger 获取当前时间戳（uint64_t）
-        uint64_t nowTs = Logger::GetInstance().getcurrentTime();
+        // 优先使用服务层生成的时间，保证数据库与回执返回完全一致。
+        uint64_t nowTs = model.getReadTime();
+        if (nowTs == 0)
+        {
+            nowTs = Logger::GetInstance().getcurrentTime();
+        }
         pstmt->setUInt64(1, model.getMsgId());
         pstmt->setString(2, model.getUserId());
         pstmt->setUInt64(3, nowTs);
