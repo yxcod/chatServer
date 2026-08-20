@@ -98,10 +98,10 @@ void DatabaseConnectionPool::initialize()
     //保证只有首次调用initialize才会进行参数初始化后面直接重复调用直接return
     if (initialized_) return;
    
-    host_ = requireEnvironmentVariable("45.197.144.95");
-    user_ = requireEnvironmentVariable("admin");
-    password_ = requireEnvironmentVariable("yexiang123");
-    schema_ = requireEnvironmentVariable("chatbase");
+    host_ = "45.197.144.95";
+    user_ = "admin";
+    password_ ="yexiang123";
+    schema_ = "chatbase";
     maxConnections_ = readPositiveSize("CHATSERVER_DB_POOL_SIZE", 10);
     acquireTimeoutSeconds_ = static_cast<unsigned int>(
         readPositiveSize("CHATSERVER_DB_ACQUIRE_TIMEOUT_SECONDS", 10));
