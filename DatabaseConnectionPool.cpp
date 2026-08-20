@@ -93,13 +93,15 @@ DatabaseConnectionPool::DatabaseConnectionPool() = default;
 
 void DatabaseConnectionPool::initialize()
 {
+    //加入线程锁防止首次调用就有多个线程进行初始化所以加上锁
     std::lock_guard<std::mutex> lock(mutex_);
+    //保证只有首次调用initialize才会进行参数初始化后面直接重复调用直接return
     if (initialized_) return;
-
-    host_ = requireEnvironmentVariable("CHATSERVER_DB_HOST");
-    user_ = requireEnvironmentVariable("CHATSERVER_DB_USER");
-    password_ = requireEnvironmentVariable("CHATSERVER_DB_PASSWORD");
-    schema_ = requireEnvironmentVariable("CHATSERVER_DB_SCHEMA");
+   
+    host_ = requireEnvironmentVariable("45.197.144.95");
+    user_ = requireEnvironmentVariable("admin");
+    password_ = requireEnvironmentVariable("yexiang123");
+    schema_ = requireEnvironmentVariable("chatbase");
     maxConnections_ = readPositiveSize("CHATSERVER_DB_POOL_SIZE", 10);
     acquireTimeoutSeconds_ = static_cast<unsigned int>(
         readPositiveSize("CHATSERVER_DB_ACQUIRE_TIMEOUT_SECONDS", 10));
@@ -109,7 +111,8 @@ void DatabaseConnectionPool::initialize()
     totalConnections_ = 1;
     initialized_ = true;
 }
-
+//从连接池中安全地借出一个数据库连接，并封装成 PooledConnection 返回。
+// 如果没有空闲连接，则按需创建；达到连接数上限后等待，超过等待时间则抛出异常
 PooledConnection DatabaseConnectionPool::acquire()
 {
     initialize();
@@ -121,9 +124,11 @@ PooledConnection DatabaseConnectionPool::acquire()
     {
         if (!idleConnections_.empty())
         {
+            //从队列头取出第一个连接进行使用
             auto connection = std::move(idleConnections_.front());
             idleConnections_.pop();
             lock.unlock();
+            //若为无效连接则重新创建
             if (!isUsable(connection.get()))
             {
                 try { connection = createPhysicalConnection(); }
@@ -137,7 +142,7 @@ PooledConnection DatabaseConnectionPool::acquire()
             }
             return PooledConnection(this, std::move(connection));
         }
-
+        //若当前连接小于既定数则进行创建
         if (totalConnections_ < maxConnections_)
         {
             ++totalConnections_;
