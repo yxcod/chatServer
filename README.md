@@ -10,7 +10,10 @@ Set these environment variables before starting the server:
 - `CHATSERVER_DB_USER`
 - `CHATSERVER_DB_PASSWORD`
 - `CHATSERVER_DB_SCHEMA`
-- `CHATSERVER_JWT_SECRET`
+
+The JWT signing secret is currently fixed in `UserLoginService.cpp`, so
+`CHATSERVER_JWT_SECRET` is not required. Move it back to secure external
+configuration before deploying the project publicly.
 
 Optional database pool settings:
 

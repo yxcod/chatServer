@@ -4,6 +4,13 @@ All notable project changes are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- JWT signing now uses a fixed in-code secret, so local startup and login no
+  longer require the `CHATSERVER_JWT_SECRET` environment variable.
+- Documented that production deployments should move the JWT secret back to a
+  secure external configuration before public release.
+
 ### Documentation
 
 - Added Chinese usage comments for every `PooledConnection` member function,

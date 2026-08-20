@@ -3,18 +3,15 @@
 #endif
 
 #include "UserLoginService.h"
-#include <cstdlib>
-#include <stdexcept>
 #include "LoginDao.h"
 #include "UserInfoDao.h"
+
+// 初始化密码加密工具和 JWT 工具；JWT 密钥当前按项目要求固定在代码中。
 UserLoginService::UserLoginService()
 {
-	encryptUtil = std::make_shared<OpenSslEncryptUtil>();  // SHA256 鍔犲瘑
-	const char* jwtSecret = std::getenv("CHATSERVER_JWT_SECRET");
-	if (!jwtSecret || *jwtSecret == '\0')
-	{
-		throw std::runtime_error("Missing CHATSERVER_JWT_SECRET environment variable.");
-	}
+	encryptUtil = std::make_shared<OpenSslEncryptUtil>();
+	// 固定密钥可避免重启后旧 Token 失效，但生产环境应改回安全的外部配置。
+	constexpr const char* jwtSecret = "c9bb708f526d420ea88d83cd316d662921646869efaf425eb150ab99d20f48bc";
 	tokenUtil = std::make_shared<JwtTokenUtil>(jwtSecret);
 }
 Json::Value UserLoginService::registerUser(const std::string& account, const std::string& password)
