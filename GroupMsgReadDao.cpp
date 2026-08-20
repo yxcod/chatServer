@@ -8,27 +8,58 @@ bool GroupMsgReadDao::markRead(const GroupMsgReadModel &model)
     {
         auto con = Logger::GetInstance().createConnection();
 
-        // 直接更新已有记录的 readTime
-        // 若想“没有记录就插一条”，可以改成 INSERT ... ON DUPLICATE KEY UPDATE
+        // 即使初始化未读记录遗漏，也能通过回执补建已读记录。
         std::unique_ptr<sql::PreparedStatement> pstmt(
             con->prepareStatement(
-                "UPDATE groupMsgRead "
-                "SET readTime = ? "
-                "WHERE msgId = ? AND userId = ?"));
+                "INSERT INTO groupMsgRead (msgId, userId, readTime) "
+                "VALUES (?, ?, ?) "
+                "ON DUPLICATE KEY UPDATE readTime = VALUES(readTime)"));
 
         // 使用 Logger 获取当前时间戳（uint64_t）
         uint64_t nowTs = Logger::GetInstance().getcurrentTime();
-        pstmt->setUInt64(1, nowTs);
-        pstmt->setUInt64(2, model.getMsgId());
-        pstmt->setString(3, model.getUserId());
+        pstmt->setUInt64(1, model.getMsgId());
+        pstmt->setString(2, model.getUserId());
+        pstmt->setUInt64(3, nowTs);
 
-        return pstmt->executeUpdate() > 0;
+        pstmt->executeUpdate();
+        return true;
     }
     catch (const std::exception& e)
     {
         Logger::GetInstance().error(e.what());
     }
     return false;
+}
+
+std::vector<GroupMsgReadModel> GroupMsgReadDao::getReadStatusesByMsg(uint64_t msgId) const
+{
+    std::vector<GroupMsgReadModel> result;
+    try
+    {
+        auto con = Logger::GetInstance().createConnection();
+        std::unique_ptr<sql::PreparedStatement> pstmt(
+            con->prepareStatement(
+                "SELECT id, msgId, userId, readTime "
+                "FROM groupMsgRead "
+                "WHERE msgId = ?"));
+
+        pstmt->setUInt64(1, msgId);
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+        while (res->next())
+        {
+            GroupMsgReadModel m;
+            m.setId(res->getUInt64("id"));
+            m.setMsgId(res->getUInt64("msgId"));
+            m.setUserId(res->getString("userId"));
+            m.setReadTime(res->getUInt64("readTime"));
+            result.push_back(std::move(m));
+        }
+    }
+    catch (const std::exception& e)
+    {
+        Logger::GetInstance().error(e.what());
+    }
+    return result;
 }
 
 std::vector<GroupMsgReadModel> GroupMsgReadDao::getReadersByMsg(uint64_t msgId) const

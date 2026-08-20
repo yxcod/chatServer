@@ -177,6 +177,7 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
         std::string sender = jsonMsg["sendUserId"].asString();
 		int groupId = jsonMsg["receiveId"].asInt();
 		std::vector<std::string> userIds = groupService.getUserIds(groupId);
+		std::string forwardStr = groupService.handleGroupMessage(jsonMsg);
         std::lock_guard<std::mutex> lock(connMutex);
         for (const auto& member : userIds)
         {
@@ -187,8 +188,7 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
             {
                 continue;
             }
-			std::string forwardStr = groupService.handleGroupMessage (jsonMsg);
-			//用户在线则转发 
+			//用户在线则转发
             if (it != onlineUsers.end() && it->second && it->second->connected())
             {
                 it->second->send(forwardStr);
@@ -201,12 +201,11 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
     else if (msgType == "groupChatCallback")
     {
         GroupService groupService;
-        std::string sender = jsonMsg["sender"].asString();
         //反馈给receiveId 他的消息已读
         std::string receiveId = jsonMsg["receiveId"].asString();
-        auto it = onlineUsers.find(receiveId);
 		std::string forward = groupService.groupMessageRead(jsonMsg);
         std::lock_guard<std::mutex> lock(connMutex);
+		auto it = onlineUsers.find(receiveId);
 		//若对方在线则转发已读回执 不在线则只处理数据库中已读标记
         if (it != onlineUsers.end() && it->second && it->second->connected())
         {

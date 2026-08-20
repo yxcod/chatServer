@@ -18,6 +18,9 @@ public:
     // 查询某条消息所有已读用户
     std::vector<GroupMsgReadModel> getReadersByMsg(uint64_t msgId) const;
 
+    // 查询某条消息的完整阅读状态，由服务层拆分已读和未读用户。
+    std::vector<GroupMsgReadModel> getReadStatusesByMsg(uint64_t msgId) const;
+
     // 查询用户对某群消息的已读记录（可选）
     std::vector<GroupMsgReadModel> getUserReadRecords(const std::string& userId,
                                                       uint64_t msgIdBegin,

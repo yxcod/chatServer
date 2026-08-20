@@ -112,17 +112,26 @@ Json::Value GroupService::getGroupChatRecord(const Json::Value& groupInfo)
 		msgJson["isDeleted"] = static_cast<int>(m.getIsDeleted());
 		msgJson["isRead"] = static_cast<int>(m.getIsRead());
 
-		// 3.1 查询该消息的已读用户列表
-		auto readers = readDao.getReadersByMsg(m.getMsgId());
+		// 3.1 一次查询完整阅读状态，再拆分为已读和未读用户。
+		auto readStatuses = readDao.getReadStatusesByMsg(m.getMsgId());
 		Json::Value readArray(Json::arrayValue);
-		for (const auto& r : readers)
+		Json::Value unreadArray(Json::arrayValue);
+		for (const auto& r : readStatuses)
 		{
 			Json::Value rJson;
 			rJson["userId"] = r.getUserId();
 			rJson["readTime"] = Json::UInt64(r.getReadTime());
-			readArray.append(rJson);
+			if (r.getReadTime() > 0)
+			{
+				readArray.append(rJson);
+			}
+			else
+			{
+				unreadArray.append(rJson);
+			}
 		}
 		msgJson["readers"] = readArray;
+		msgJson["unreaders"] = unreadArray;
 
 		msgArray.append(msgJson);
 	}
