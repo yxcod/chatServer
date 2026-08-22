@@ -27,15 +27,27 @@ namespace api {
 	}
 
 	std::optional<std::string> FileService::getFilePath(const std::string& rootDir,
-		const std::string& filename) {
-		//std::string uploadPath = drogon::app().getUploadPath();
-		std::string filePath = rootDir + "/" + filename;
+			const std::string& filename) {
+		try {
+			auto rootPath = fs::weakly_canonical(fs::path(rootDir));
+			auto filePath = fs::weakly_canonical(rootPath / filename);
 
-		if (!fs::exists(filePath)) {
+			auto rootIt = rootPath.begin();
+			auto fileIt = filePath.begin();
+			for (; rootIt != rootPath.end() && fileIt != filePath.end(); ++rootIt, ++fileIt) {
+				if (*rootIt != *fileIt) {
+					return std::nullopt;
+				}
+			}
+			if (rootIt != rootPath.end() || !fs::exists(filePath) || !fs::is_regular_file(filePath)) {
+				return std::nullopt;
+			}
+
+			return filePath.string();
+		}
+		catch (...) {
 			return std::nullopt;
 		}
-
-		return filePath;
 	}
 
 	std::optional<std::pair<size_t, size_t>> FileService::parseRangeHeader(
@@ -47,7 +59,7 @@ namespace api {
 			return std::nullopt;
 		}
 
-		return ranges[0]; // ÷ª»°µ⁄“ª∏ˆ RANGE ∂Œ
+		return ranges[0]; // Âè™ÂèñÁ¨¨‰∏Ä‰∏™ RANGE ÊÆµ
 	}
 
 	std::optional<std::pair<std::string, size_t>> FileService::readFileRange(

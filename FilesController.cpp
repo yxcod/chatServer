@@ -1,14 +1,89 @@
 #include "FilesController.h"
 #include "FileService.h"
 #include <json/json.h>
-#include<fstream>
+#include <algorithm>
+#include <cctype>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
+
+namespace {
+	constexpr std::size_t kMaxImageBytes = 5 * 1024 * 1024;
+	const std::filesystem::path kImageRoot = "./imageData";
+
+	bool isSafePathSegment(const std::string& value) {
+		if (value.empty() || value == "." || value == ".." || value.size() > 180) {
+			return false;
+		}
+		return std::none_of(value.begin(), value.end(), [](unsigned char ch) {
+			return ch < 0x20 || ch == 0x7f || ch == '/' || ch == '\\' || ch == ':';
+		});
+	}
+
+	std::string lowercase(std::string value) {
+		std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+			return static_cast<char>(std::tolower(ch));
+		});
+		return value;
+	}
+
+	std::string detectImageMime(std::string_view data) {
+		if (data.size() >= 3 &&
+			static_cast<unsigned char>(data[0]) == 0xff &&
+			static_cast<unsigned char>(data[1]) == 0xd8 &&
+			static_cast<unsigned char>(data[2]) == 0xff) {
+			return "image/jpeg";
+		}
+		static constexpr unsigned char pngSignature[] = {
+			0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a
+		};
+		if (data.size() >= sizeof(pngSignature) &&
+			std::equal(std::begin(pngSignature), std::end(pngSignature),
+				reinterpret_cast<const unsigned char*>(data.data()))) {
+			return "image/png";
+		}
+		if (data.size() >= 12 && data.substr(0, 4) == "RIFF" && data.substr(8, 4) == "WEBP") {
+			return "image/webp";
+		}
+		return {};
+	}
+
+	bool extensionMatchesMime(const std::string& filename, const std::string& mime) {
+		auto extension = lowercase(std::filesystem::path(filename).extension().string());
+		if (mime == "image/jpeg") return extension == ".jpg" || extension == ".jpeg";
+		if (mime == "image/png") return extension == ".png";
+		if (mime == "image/webp") return extension == ".webp";
+		return false;
+	}
+
+	drogon::HttpResponsePtr jsonResponse(int code,
+		const std::string& message,
+		drogon::HttpStatusCode status) {
+		Json::Value json;
+		json["code"] = code;
+		json["message"] = message;
+		auto response = drogon::HttpResponse::newHttpJsonResponse(json);
+		response->setStatusCode(status);
+		return response;
+	}
+
+	std::string makeEtag(const std::filesystem::path& path) {
+		auto modified = std::filesystem::last_write_time(path).time_since_epoch().count();
+		auto size = std::filesystem::file_size(path);
+		std::ostringstream stream;
+		stream << "\"" << std::hex << size << '-'
+			<< static_cast<long long>(modified) << "\"";
+		return stream.str();
+	}
+}
+
 namespace api {
 
 	void FilesController::upLoadFile(const HttpRequestPtr& req,
 		std::function<void(const HttpResponsePtr&)>&& callback) {
 		auto contentType = req->getContentType();
 		std::string request_file_root = "./ImageData";
-		//»§id
+		//æˆ·id
 		std::string filename = req->getParameter("userName");
 		if (contentType == CT_APPLICATION_OCTET_STREAM ||
 			contentType == CT_TEXT_PLAIN ||
@@ -89,7 +164,7 @@ namespace api {
 
 		auto fileDir = "./ImageData/" + req->getParameter("userid");
 		auto fileName = req->getParameter("imageName");
-		// »ñÈ¡ÎÄ¼şÂ·¾¶
+		// è·å–æ–‡ä»¶è·¯å¾„
 		auto filePathOpt = FileService::getFilePath(fileDir, fileName);
 		if (!filePathOpt.has_value()) {
 			Json::Value json;
@@ -100,14 +175,14 @@ namespace api {
 			return;
 		}
 
-		// »ñÈ¡ÎÄ¼ş´óĞ¡
+		// è·å–æ–‡ä»¶å¤§å°
 		auto filePath = filePathOpt.value();
 		auto fileSize = std::filesystem::file_size(filePath);
 
-		// ½âÎö Range ÇëÇóÍ·
+		// è§£æ Range è¯·æ±‚å¤´
 		auto rangeHeader = req->getHeader("Range");
 		auto rangeOpt = FileService::parseRangeHeader(rangeHeader, fileSize);
-		//ÅĞ¶ÏrangeHeader¸ñÊ½(bytes=0-1023)ÊÇ·ñ¹æ·¶ºÍÒª»ñÈ¡µÄ´óĞ¡·¶Î§ÊÇ·ñºÏ·¨
+		//åˆ¤æ–­rangeHeaderæ ¼å¼(bytes=0-1023)æ˜¯å¦è§„èŒƒå’Œè¦è·å–çš„å¤§å°èŒƒå›´æ˜¯å¦åˆæ³•
 		if (!rangeOpt.has_value()) {
 			auto resp = HttpResponse::newHttpResponse(
 				drogon::k416RequestedRangeNotSatisfiable,
@@ -117,10 +192,10 @@ namespace api {
 		}
 
 		auto [start, end] = rangeOpt.value();
-		//Èô²»´ørangeOptÍ·ÔòÄ¬ÈÏÎªÍêÕûÏÂÔØ
+		//è‹¥ä¸å¸¦rangeOptå¤´åˆ™é»˜è®¤ä¸ºå®Œæ•´ä¸‹è½½
 		if (rangeHeader.empty()) {
-			// ·µ»ØÍêÕûÎÄ¼ş£ºHTTP 200 ×´Ì¬Âë
-			// ·µ»ØÍêÕûÎÄ¼ş
+			// è¿”å›å®Œæ•´æ–‡ä»¶ï¼šHTTP 200 çŠ¶æ€ç 
+			// è¿”å›å®Œæ•´æ–‡ä»¶
 			auto resp = HttpResponse::newFileResponse(filePath);
 			resp->setContentTypeCode(drogon::CT_APPLICATION_OCTET_STREAM);
 			resp->addHeader("Accept-Ranges", "bytes");
@@ -128,7 +203,7 @@ namespace api {
 			return;
 		}
 
-		// ¶ÁÈ¡·ÖÆ¬Êı¾İ
+		// è¯»å–åˆ†ç‰‡æ•°æ®
 		auto chunkOpt = FileService::readFileRange(fileDir, fileName, start, end);
 		if (!chunkOpt.has_value()) {
 			auto resp = HttpResponse::newHttpResponse(
@@ -140,8 +215,8 @@ namespace api {
 
 		auto [data, totalSize] = chunkOpt.value();
 
-		// ¹¹ÔìÏìÓ¦
-		//¹¹Ôì·ÖÆ¬ÏìÓ¦£ºHTTP 206 ×´Ì¬Âë£¨²¿·ÖÄÚÈİ³É¹¦£©
+		// æ„é€ å“åº”
+		//æ„é€ åˆ†ç‰‡å“åº”ï¼šHTTP 206 çŠ¶æ€ç ï¼ˆéƒ¨åˆ†å†…å®¹æˆåŠŸï¼‰
 		auto resp = HttpResponse::newHttpResponse(
 			drogon::k206PartialContent,
 			drogon::CT_APPLICATION_OCTET_STREAM);
@@ -153,93 +228,131 @@ namespace api {
 		resp->setBody(data);
 		callback(resp);
 	}
-	//ÏÂÔØÍ¼Æ¬
+	//ä¸‹è½½å›¾ç‰‡
 	void FilesController::loadImage(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback)
 	{
-		auto fileDir = "./imageData/" + req->getParameter("userName");
-		if (req->getParameter("userName") == "123456")
-		{
-			std::cout << "ss";
-
-		}
-		else if (req->getParameter("userName") == "18856617420")
-		{
-			std::cout << "ss";
-		}
-		auto fileName = req->getParameter("imageName");
-		auto filePathOpt = FileService::getFilePath(fileDir, fileName);
-		if (!filePathOpt.has_value()) {
-			Json::Value json;
-			json["code"] = 404;
-			json["message"] = "File not found";
-			auto resp = HttpResponse::newHttpJsonResponse(json);
-			callback(resp);
+		const auto ownerId = req->getParameter("userName");
+		const auto fileName = req->getParameter("imageName");
+		if (!isSafePathSegment(ownerId) || !isSafePathSegment(fileName)) {
+			callback(jsonResponse(400, "Invalid image path", drogon::k400BadRequest));
 			return;
 		}
-		auto filePath = filePathOpt.value();
-		std::ifstream file(filePath, std::ios::binary);
-		std::vector<char> buffer((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-		auto resp = HttpResponse::newHttpResponse();
-		resp->setStatusCode(k200OK);
-		resp->setBody(std::string(buffer.begin(), buffer.end()));
-		resp->setContentTypeCode(CT_IMAGE_JPG);
-		callback(resp);
 
+		auto fileDir = (kImageRoot / ownerId).string();
+		auto filePathOpt = FileService::getFilePath(fileDir, fileName);
+		if (!filePathOpt.has_value()) {
+			callback(jsonResponse(404, "File not found", drogon::k404NotFound));
+			return;
+		}
 
+		const std::filesystem::path filePath(filePathOpt.value());
+		std::ifstream input(filePath, std::ios::binary);
+		char header[16]{};
+		input.read(header, sizeof(header));
+		const auto mime = detectImageMime(std::string_view(header, static_cast<std::size_t>(input.gcount())));
+		if (mime.empty()) {
+			callback(jsonResponse(415, "Unsupported image format", drogon::k415UnsupportedMediaType));
+			return;
+		}
+
+		const auto etag = makeEtag(filePath);
+		if (req->getHeader("If-None-Match") == etag) {
+			auto response = HttpResponse::newHttpResponse();
+			response->setStatusCode(drogon::k304NotModified);
+			response->addHeader("ETag", etag);
+			response->addHeader("Cache-Control", "private, max-age=31536000, immutable");
+			callback(response);
+			return;
+		}
+
+		auto response = HttpResponse::newFileResponse(filePath.string());
+		response->setContentTypeString(mime);
+		response->addHeader("ETag", etag);
+		response->addHeader("Cache-Control", "private, max-age=31536000, immutable");
+		response->addHeader("X-Content-Type-Options", "nosniff");
+		callback(response);
 	}
-	// - userName: ÓÃ»§Ãû
-	// - imageName: Í¼Æ¬Ãû£¨²»º¬ºó×º£©
-	// - file: Í¼Æ¬¶ş½øÖÆÄÚÈİ
+	// - userName: ç”¨æˆ·å
+	// - imageName: å¸¦æ‰©å±•åçš„å›¾ç‰‡å
+	// - file: å›¾ç‰‡äºŒè¿›åˆ¶å†…å®¹
 	void FilesController::upLoadImage(const HttpRequestPtr& req,
 		std::function<void(const HttpResponsePtr&)>&& callback)
 	{
-		Json::Value json;
-		std::string request_file_root = "./ImageData";
-		std::string filename = req->getParameter("userName");
+		const auto ownerId = req->getParameter("userName");
+		const auto requestedName = req->getParameter("imageName");
+		if (!isSafePathSegment(ownerId) || !isSafePathSegment(requestedName)) {
+			callback(jsonResponse(105, "Invalid image path", drogon::k400BadRequest));
+			return;
+		}
+
 		auto contentType = req->getContentType();
-		//¶ş½øÖÆÁùÎÄ¼ş
 		if (contentType == CT_MULTIPART_FORM_DATA) {
 			MultiPartParser parser;
 			int result = parser.parse(req);
 			if (result != 0) {
-				json["code"] = 101;
-				json["message"] = "Failed to parse multipart/form-data request";
-				auto resp = HttpResponse::newHttpJsonResponse(json);
-				callback(resp);
+				callback(jsonResponse(101, "Failed to parse multipart/form-data request", drogon::k400BadRequest));
 				return;
 			}
 
 			const auto& files = parser.getFiles();
-			if (files.empty()) {
-				json["code"] = 102;
-				json["message"] = "No files uploaded";
-				auto resp = HttpResponse::newHttpJsonResponse(json);
-				callback(resp);
+			if (files.size() != 1) {
+				callback(jsonResponse(102, "Exactly one image is required", drogon::k400BadRequest));
 				return;
 			}
 
 			const auto& uploadedFile = files[0];
-			std::string customPath = request_file_root + "/" + filename;
-			int ret = uploadedFile.save(customPath);
-
-			if (ret != 0) {
-				json["code"] = 103;
-				json["message"] = "Failed to save file";
-				auto resp = HttpResponse::newHttpJsonResponse(json);
-				callback(resp);
+			if (uploadedFile.fileLength() == 0 || uploadedFile.fileLength() > kMaxImageBytes) {
+				callback(jsonResponse(106, "Image must be between 1 byte and 5 MB", drogon::k413RequestEntityTooLarge));
+				return;
+			}
+			if (uploadedFile.getFileName() != requestedName) {
+				callback(jsonResponse(107, "Image name mismatch", drogon::k400BadRequest));
 				return;
 			}
 
+			const auto mime = detectImageMime(uploadedFile.fileContent());
+			if (mime.empty() || !extensionMatchesMime(requestedName, mime)) {
+				callback(jsonResponse(108, "Only matching JPEG, PNG and WebP images are supported", drogon::k415UnsupportedMediaType));
+				return;
+			}
 
+			const auto ownerDir = kImageRoot / ownerId;
+			std::error_code directoryError;
+			std::filesystem::create_directories(ownerDir, directoryError);
+			if (directoryError) {
+				callback(jsonResponse(103, "Failed to create image directory", drogon::k500InternalServerError));
+				return;
+			}
+
+			const auto destination = ownerDir / requestedName;
+			const auto temporary = ownerDir / (requestedName + ".uploading");
+			int ret = uploadedFile.saveAs(temporary.string());
+
+			if (ret != 0) {
+				callback(jsonResponse(103, "Failed to save image", drogon::k500InternalServerError));
+				return;
+			}
+
+			std::error_code renameError;
+			std::filesystem::rename(temporary, destination, renameError);
+			if (renameError) {
+				std::error_code removeError;
+				std::filesystem::remove(temporary, removeError);
+				callback(jsonResponse(103, "Failed to finalize image", drogon::k500InternalServerError));
+				return;
+			}
+
+			Json::Value json;
 			json["code"] = 100;
 			json["message"] = "File uploaded successfully";
+			json["imageName"] = requestedName;
+			json["mimeType"] = mime;
+			json["byteSize"] = static_cast<Json::UInt64>(uploadedFile.fileLength());
 			auto resp = HttpResponse::newHttpJsonResponse(json);
+			resp->setStatusCode(drogon::k200OK);
 			callback(resp);
 			return;
 		}
-		json["code"] = 104;
-		json["message"] = "Unsupported Content-Type";
-		auto resp = HttpResponse::newHttpJsonResponse(json);
-		callback(resp);
+		callback(jsonResponse(104, "Unsupported Content-Type", drogon::k415UnsupportedMediaType));
 	}
 }
