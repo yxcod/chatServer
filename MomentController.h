@@ -15,6 +15,7 @@ public:
     METHOD_LIST_BEGIN
         ADD_METHOD_TO(MomentController::publish, "/api/moment/publish", drogon::Post);
         ADD_METHOD_TO(MomentController::ownList, "/api/moment/ownList", drogon::Post);
+        ADD_METHOD_TO(MomentController::userList, "/api/moment/userList", drogon::Post);
         ADD_METHOD_TO(MomentController::toggleLike, "/api/moment/toggleLike", drogon::Post);
         ADD_METHOD_TO(MomentController::addComment, "/api/moment/comment", drogon::Post);
     METHOD_LIST_END
@@ -35,6 +36,12 @@ public:
                     std::function<void(const drogon::HttpResponsePtr&)>&& callback)
     {
         handle(request, std::move(callback), &MomentService::toggleLike);
+    }
+
+    void userList(const drogon::HttpRequestPtr& request,
+                  std::function<void(const drogon::HttpResponsePtr&)>&& callback)
+    {
+        handle(request, std::move(callback), &MomentService::userList);
     }
 
     void addComment(const drogon::HttpRequestPtr& request,

@@ -114,25 +114,50 @@ std::vector<MomentModel> MomentDao::getOwnMoments(
     std::uint64_t beforeMomentId,
     unsigned int limit) const
 {
+    return getVisibleMoments(userName, userName, beforeMomentId, limit);
+}
+
+std::vector<MomentModel> MomentDao::getVisibleMoments(
+    const std::string& viewerUserName,
+    const std::string& authorUserName,
+    std::uint64_t beforeMomentId,
+    unsigned int limit) const
+{
     auto pooled = DatabaseConnectionPool::instance().acquire();
     sql::Connection* connection = pooled.operator->();
     const bool hasCursor = beforeMomentId > 0;
     const std::string query = hasCursor
-        ? "SELECT momentId FROM moment WHERE authorUserName = ? AND status = 0 "
-          "AND momentId < ? ORDER BY momentId DESC LIMIT ?"
-        : "SELECT momentId FROM moment WHERE authorUserName = ? AND status = 0 "
-          "ORDER BY momentId DESC LIMIT ?";
+        ? "SELECT m.momentId FROM moment m "
+          "WHERE m.authorUserName = ? AND m.status = 0 AND m.momentId < ? "
+          "AND (m.authorUserName = ? OR m.visibility = 0 OR "
+          "(m.visibility = 1 AND EXISTS (SELECT 1 FROM friendrelation fr "
+          "WHERE fr.status = 1 AND ((fr.fromUserId = ? AND fr.toUserId = m.authorUserName) "
+          "OR (fr.toUserId = ? AND fr.fromUserId = m.authorUserName))))) "
+          "ORDER BY m.momentId DESC LIMIT ?"
+        : "SELECT m.momentId FROM moment m "
+          "WHERE m.authorUserName = ? AND m.status = 0 "
+          "AND (m.authorUserName = ? OR m.visibility = 0 OR "
+          "(m.visibility = 1 AND EXISTS (SELECT 1 FROM friendrelation fr "
+          "WHERE fr.status = 1 AND ((fr.fromUserId = ? AND fr.toUserId = m.authorUserName) "
+          "OR (fr.toUserId = ? AND fr.fromUserId = m.authorUserName))))) "
+          "ORDER BY m.momentId DESC LIMIT ?";
 
     std::unique_ptr<sql::PreparedStatement> statement(connection->prepareStatement(query));
-    statement->setString(1, userName);
+    statement->setString(1, authorUserName);
     if (hasCursor)
     {
         statement->setUInt64(2, beforeMomentId);
-        statement->setUInt(3, limit);
+        statement->setString(3, viewerUserName);
+        statement->setString(4, viewerUserName);
+        statement->setString(5, viewerUserName);
+        statement->setUInt(6, limit);
     }
     else
     {
-        statement->setUInt(2, limit);
+        statement->setString(2, viewerUserName);
+        statement->setString(3, viewerUserName);
+        statement->setString(4, viewerUserName);
+        statement->setUInt(5, limit);
     }
 
     std::unique_ptr<sql::ResultSet> result(statement->executeQuery());
@@ -146,7 +171,7 @@ std::vector<MomentModel> MomentDao::getOwnMoments(
     moments.reserve(momentIds.size());
     for (const auto momentId : momentIds)
     {
-        moments.push_back(getMoment(connection, momentId, userName));
+        moments.push_back(getMoment(connection, momentId, viewerUserName));
     }
     return moments;
 }
@@ -161,12 +186,7 @@ MomentModel MomentDao::toggleLike(std::uint64_t momentId,
 
     try
     {
-        std::unique_ptr<sql::PreparedStatement> lockStatement(
-            connection->prepareStatement(
-                "SELECT momentId FROM moment WHERE momentId = ? AND status = 0 FOR UPDATE"));
-        lockStatement->setUInt64(1, momentId);
-        std::unique_ptr<sql::ResultSet> locked(lockStatement->executeQuery());
-        if (!locked->next()) throw std::runtime_error("Moment not found");
+        lockVisibleMoment(connection, momentId, userName);
 
         std::unique_ptr<sql::PreparedStatement> findStatement(
             connection->prepareStatement(
@@ -237,12 +257,7 @@ MomentModel MomentDao::addComment(std::uint64_t momentId,
 
     try
     {
-        std::unique_ptr<sql::PreparedStatement> lockStatement(
-            connection->prepareStatement(
-                "SELECT momentId FROM moment WHERE momentId = ? AND status = 0 FOR UPDATE"));
-        lockStatement->setUInt64(1, momentId);
-        std::unique_ptr<sql::ResultSet> locked(lockStatement->executeQuery());
-        if (!locked->next()) throw std::runtime_error("Moment not found");
+        lockVisibleMoment(connection, momentId, userName);
 
         MomentCommentModel comment;
         comment.setMomentId(momentId);
@@ -294,9 +309,16 @@ MomentModel MomentDao::getMoment(sql::Connection* connection,
             "EXISTS(SELECT 1 FROM momentLike ml WHERE ml.momentId = m.momentId "
             "AND ml.userName = ?) AS isLiked "
             "FROM moment m JOIN userinfo u ON u.userName = m.authorUserName "
-            "WHERE m.momentId = ? AND m.status = 0 LIMIT 1"));
+            "WHERE m.momentId = ? AND m.status = 0 "
+            "AND (m.authorUserName = ? OR m.visibility = 0 OR "
+            "(m.visibility = 1 AND EXISTS (SELECT 1 FROM friendrelation fr "
+            "WHERE fr.status = 1 AND ((fr.fromUserId = ? AND fr.toUserId = m.authorUserName) "
+            "OR (fr.toUserId = ? AND fr.fromUserId = m.authorUserName))))) LIMIT 1"));
     statement->setString(1, viewerUserName);
     statement->setUInt64(2, momentId);
+    statement->setString(3, viewerUserName);
+    statement->setString(4, viewerUserName);
+    statement->setString(5, viewerUserName);
     std::unique_ptr<sql::ResultSet> result(statement->executeQuery());
     if (!result->next()) throw std::runtime_error("Moment not found");
 
@@ -414,4 +436,27 @@ std::vector<MomentCommentModel> MomentDao::getComments(
         comments.push_back(std::move(comment));
     }
     return comments;
+}
+
+void MomentDao::lockVisibleMoment(
+    sql::Connection* connection,
+    std::uint64_t momentId,
+    const std::string& viewerUserName) const
+{
+    std::unique_ptr<sql::PreparedStatement> statement(
+        connection->prepareStatement(
+            "SELECT m.momentId FROM moment m WHERE m.momentId = ? AND m.status = 0 "
+            "AND (m.authorUserName = ? OR m.visibility = 0 OR "
+            "(m.visibility = 1 AND EXISTS (SELECT 1 FROM friendrelation fr "
+            "WHERE fr.status = 1 AND ((fr.fromUserId = ? AND fr.toUserId = m.authorUserName) "
+            "OR (fr.toUserId = ? AND fr.fromUserId = m.authorUserName))))) FOR UPDATE"));
+    statement->setUInt64(1, momentId);
+    statement->setString(2, viewerUserName);
+    statement->setString(3, viewerUserName);
+    statement->setString(4, viewerUserName);
+    std::unique_ptr<sql::ResultSet> result(statement->executeQuery());
+    if (!result->next())
+    {
+        throw std::runtime_error("Moment not found or not visible");
+    }
 }

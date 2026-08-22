@@ -213,6 +213,40 @@ Json::Value MomentService::ownList(const std::string& userName,
     }
 }
 
+Json::Value MomentService::userList(const std::string& userName,
+                                    const Json::Value& request) const
+{
+    const std::string authorUserName = trim(
+        request.get("targetUserName", "").asString());
+    if (authorUserName.empty() || authorUserName.size() > 50)
+    {
+        return response(101, "Invalid target user");
+    }
+
+    try
+    {
+        const auto beforeMomentId = readUInt64(request["beforeMomentId"]);
+        const auto requestedLimit = request.get("limit", 30).asUInt();
+        const auto limit = std::max(1U, std::min(requestedLimit, 50U));
+        const auto moments = MomentDao().getVisibleMoments(
+            userName, authorUserName, beforeMomentId, limit);
+        Json::Value items(Json::arrayValue);
+        for (const auto& moment : moments)
+        {
+            items.append(momentToJson(moment));
+        }
+        Json::Value result(Json::objectValue);
+        result["items"] = std::move(items);
+        result["hasMore"] = moments.size() == limit;
+        return successWithData(std::move(result));
+    }
+    catch (const std::exception& error)
+    {
+        std::cerr << "Load visible moments failed: " << error.what() << '\n';
+        return response(102, "Failed to load moments");
+    }
+}
+
 Json::Value MomentService::toggleLike(const std::string& userName,
                                       const Json::Value& request) const
 {

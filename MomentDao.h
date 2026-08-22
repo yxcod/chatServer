@@ -18,6 +18,10 @@ public:
     std::vector<MomentModel> getOwnMoments(const std::string& userName,
                                            std::uint64_t beforeMomentId,
                                            unsigned int limit) const;
+    std::vector<MomentModel> getVisibleMoments(const std::string& viewerUserName,
+                                               const std::string& authorUserName,
+                                               std::uint64_t beforeMomentId,
+                                               unsigned int limit) const;
     MomentModel toggleLike(std::uint64_t momentId,
                            const std::string& userName,
                            std::uint64_t now) const;
@@ -34,4 +38,7 @@ private:
                                            std::uint64_t momentId) const;
     std::vector<MomentCommentModel> getComments(sql::Connection* connection,
                                                 std::uint64_t momentId) const;
+    void lockVisibleMoment(sql::Connection* connection,
+                           std::uint64_t momentId,
+                           const std::string& viewerUserName) const;
 };
