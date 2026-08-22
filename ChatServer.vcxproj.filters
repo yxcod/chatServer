@@ -48,7 +48,19 @@
       <Filter>源文件\Model</Filter>
     </ClInclude>
     <ClInclude Include="MomentController.h" />
+    <ClInclude Include="MomentCommentModel.h">
+      <Filter>源文件\Model</Filter>
+    </ClInclude>
     <ClInclude Include="MomentDao.h" />
+    <ClInclude Include="MomentLikeModel.h">
+      <Filter>源文件\Model</Filter>
+    </ClInclude>
+    <ClInclude Include="MomentMediaModel.h">
+      <Filter>源文件\Model</Filter>
+    </ClInclude>
+    <ClInclude Include="MomentModel.h">
+      <Filter>源文件\Model</Filter>
+    </ClInclude>
     <ClInclude Include="MomentService.h" />
     <ClInclude Include="UserLoginService.h">
       <Filter>源文件\Service</Filter>

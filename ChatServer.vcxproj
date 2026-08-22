@@ -208,7 +208,11 @@
     <ClInclude Include="LoginDao.h" />
     <ClInclude Include="LoginModel.h" />
     <ClInclude Include="MomentController.h" />
+    <ClInclude Include="MomentCommentModel.h" />
     <ClInclude Include="MomentDao.h" />
+    <ClInclude Include="MomentLikeModel.h" />
+    <ClInclude Include="MomentMediaModel.h" />
+    <ClInclude Include="MomentModel.h" />
     <ClInclude Include="MomentService.h" />
     <ClInclude Include="ProxyController.h" />
     <ClInclude Include="RangeUtils.h" />

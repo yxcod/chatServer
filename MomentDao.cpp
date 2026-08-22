@@ -8,6 +8,7 @@
 #include <jdbc/cppconn/statement.h>
 
 #include "DatabaseConnectionPool.h"
+#include "MomentLikeModel.h"
 
 namespace
 {
@@ -36,7 +37,9 @@ void rollbackQuietly(sql::Connection* connection)
 }
 }
 
-Json::Value MomentDao::createMoment(const MomentCreateData& data) const
+MomentModel MomentDao::createMoment(
+    MomentModel moment,
+    const std::vector<MomentMediaModel>& media) const
 {
     auto pooled = DatabaseConnectionPool::instance().acquire();
     sql::Connection* connection = pooled.operator->();
@@ -44,21 +47,21 @@ Json::Value MomentDao::createMoment(const MomentCreateData& data) const
 
     try
     {
-        if (!data.clientRequestId.empty())
+        if (!moment.getClientRequestId().empty())
         {
             std::unique_ptr<sql::PreparedStatement> existingStatement(
                 connection->prepareStatement(
                     "SELECT momentId FROM moment "
                     "WHERE authorUserName = ? AND clientRequestId = ? LIMIT 1"));
-            existingStatement->setString(1, data.authorUserName);
-            existingStatement->setString(2, data.clientRequestId);
+            existingStatement->setString(1, moment.getAuthorUserName());
+            existingStatement->setString(2, moment.getClientRequestId());
             std::unique_ptr<sql::ResultSet> existing(existingStatement->executeQuery());
             if (existing->next())
             {
                 const auto momentId = existing->getUInt64("momentId");
                 connection->commit();
                 connection->setAutoCommit(true);
-                return getMoment(connection, momentId, data.authorUserName);
+                return getMoment(connection, momentId, moment.getAuthorUserName());
             }
         }
 
@@ -68,36 +71,36 @@ Json::Value MomentDao::createMoment(const MomentCreateData& data) const
                 "(authorUserName, content, visibility, locationName, likeCount, "
                 "commentCount, clientRequestId, status, createdAt, updatedAt) "
                 "VALUES (?, ?, ?, NULLIF(?, ''), 0, 0, NULLIF(?, ''), 0, ?, ?)"));
-        momentStatement->setString(1, data.authorUserName);
-        momentStatement->setString(2, data.content);
-        momentStatement->setUInt(3, data.visibility);
-        momentStatement->setString(4, data.locationName);
-        momentStatement->setString(5, data.clientRequestId);
-        momentStatement->setUInt64(6, data.createdAt);
-        momentStatement->setUInt64(7, data.createdAt);
+        momentStatement->setString(1, moment.getAuthorUserName());
+        momentStatement->setString(2, moment.getContent());
+        momentStatement->setUInt(3, moment.getVisibility());
+        momentStatement->setString(4, moment.getLocationName());
+        momentStatement->setString(5, moment.getClientRequestId());
+        momentStatement->setUInt64(6, moment.getCreatedAt());
+        momentStatement->setUInt64(7, moment.getUpdatedAt());
         momentStatement->executeUpdate();
 
         const auto momentId = lastInsertId(connection);
-        if (!data.mediaUrls.empty())
+        if (!media.empty())
         {
             std::unique_ptr<sql::PreparedStatement> mediaStatement(
                 connection->prepareStatement(
                     "INSERT INTO momentMedia "
                     "(momentId, mediaType, mediaUrl, sortOrder, createdAt) "
                     "VALUES (?, 0, ?, ?, ?)"));
-            for (std::size_t index = 0; index < data.mediaUrls.size(); ++index)
+            for (const auto& mediaItem : media)
             {
                 mediaStatement->setUInt64(1, momentId);
-                mediaStatement->setString(2, data.mediaUrls[index]);
-                mediaStatement->setUInt(3, static_cast<unsigned int>(index));
-                mediaStatement->setUInt64(4, data.createdAt);
+                mediaStatement->setString(2, mediaItem.getMediaUrl());
+                mediaStatement->setUInt(3, mediaItem.getSortOrder());
+                mediaStatement->setUInt64(4, mediaItem.getCreatedAt());
                 mediaStatement->executeUpdate();
             }
         }
 
         connection->commit();
         connection->setAutoCommit(true);
-        return getMoment(connection, momentId, data.authorUserName);
+        return getMoment(connection, momentId, moment.getAuthorUserName());
     }
     catch (...)
     {
@@ -106,9 +109,10 @@ Json::Value MomentDao::createMoment(const MomentCreateData& data) const
     }
 }
 
-Json::Value MomentDao::getOwnMoments(const std::string& userName,
-                                     std::uint64_t beforeMomentId,
-                                     unsigned int limit) const
+std::vector<MomentModel> MomentDao::getOwnMoments(
+    const std::string& userName,
+    std::uint64_t beforeMomentId,
+    unsigned int limit) const
 {
     auto pooled = DatabaseConnectionPool::instance().acquire();
     sql::Connection* connection = pooled.operator->();
@@ -138,16 +142,16 @@ Json::Value MomentDao::getOwnMoments(const std::string& userName,
         momentIds.push_back(result->getUInt64("momentId"));
     }
 
-    Json::Value moments(Json::arrayValue);
+    std::vector<MomentModel> moments;
+    moments.reserve(momentIds.size());
     for (const auto momentId : momentIds)
     {
-        Json::Value moment = getMoment(connection, momentId, userName);
-        if (!moment.isNull()) moments.append(moment);
+        moments.push_back(getMoment(connection, momentId, userName));
     }
     return moments;
 }
 
-Json::Value MomentDao::toggleLike(std::uint64_t momentId,
+MomentModel MomentDao::toggleLike(std::uint64_t momentId,
                                   const std::string& userName,
                                   std::uint64_t now) const
 {
@@ -171,13 +175,18 @@ Json::Value MomentDao::toggleLike(std::uint64_t momentId,
         findStatement->setString(2, userName);
         std::unique_ptr<sql::ResultSet> found(findStatement->executeQuery());
 
+        MomentLikeModel like;
+        like.setMomentId(momentId);
+        like.setUserName(userName);
+        like.setCreatedAt(now);
         if (found->next())
         {
+            like.setLikeId(found->getUInt64("likeId"));
             std::unique_ptr<sql::PreparedStatement> deleteStatement(
                 connection->prepareStatement(
                     "DELETE FROM momentLike WHERE momentId = ? AND userName = ?"));
-            deleteStatement->setUInt64(1, momentId);
-            deleteStatement->setString(2, userName);
+            deleteStatement->setUInt64(1, like.getMomentId());
+            deleteStatement->setString(2, like.getUserName());
             deleteStatement->executeUpdate();
 
             std::unique_ptr<sql::PreparedStatement> countStatement(
@@ -193,9 +202,9 @@ Json::Value MomentDao::toggleLike(std::uint64_t momentId,
             std::unique_ptr<sql::PreparedStatement> insertStatement(
                 connection->prepareStatement(
                     "INSERT INTO momentLike (momentId, userName, createdAt) VALUES (?, ?, ?)"));
-            insertStatement->setUInt64(1, momentId);
-            insertStatement->setString(2, userName);
-            insertStatement->setUInt64(3, now);
+            insertStatement->setUInt64(1, like.getMomentId());
+            insertStatement->setString(2, like.getUserName());
+            insertStatement->setUInt64(3, like.getCreatedAt());
             insertStatement->executeUpdate();
 
             std::unique_ptr<sql::PreparedStatement> countStatement(
@@ -217,7 +226,7 @@ Json::Value MomentDao::toggleLike(std::uint64_t momentId,
     }
 }
 
-Json::Value MomentDao::addComment(std::uint64_t momentId,
+MomentModel MomentDao::addComment(std::uint64_t momentId,
                                   const std::string& userName,
                                   const std::string& content,
                                   std::uint64_t now) const
@@ -235,16 +244,23 @@ Json::Value MomentDao::addComment(std::uint64_t momentId,
         std::unique_ptr<sql::ResultSet> locked(lockStatement->executeQuery());
         if (!locked->next()) throw std::runtime_error("Moment not found");
 
+        MomentCommentModel comment;
+        comment.setMomentId(momentId);
+        comment.setUserName(userName);
+        comment.setContent(content);
+        comment.setCreatedAt(now);
+        comment.setUpdatedAt(now);
+
         std::unique_ptr<sql::PreparedStatement> commentStatement(
             connection->prepareStatement(
                 "INSERT INTO momentComment "
                 "(momentId, userName, content, status, createdAt, updatedAt) "
                 "VALUES (?, ?, ?, 0, ?, ?)"));
-        commentStatement->setUInt64(1, momentId);
-        commentStatement->setString(2, userName);
-        commentStatement->setString(3, content);
-        commentStatement->setUInt64(4, now);
-        commentStatement->setUInt64(5, now);
+        commentStatement->setUInt64(1, comment.getMomentId());
+        commentStatement->setString(2, comment.getUserName());
+        commentStatement->setString(3, comment.getContent());
+        commentStatement->setUInt64(4, comment.getCreatedAt());
+        commentStatement->setUInt64(5, comment.getUpdatedAt());
         commentStatement->executeUpdate();
 
         std::unique_ptr<sql::PreparedStatement> countStatement(
@@ -265,14 +281,15 @@ Json::Value MomentDao::addComment(std::uint64_t momentId,
     }
 }
 
-Json::Value MomentDao::getMoment(sql::Connection* connection,
+MomentModel MomentDao::getMoment(sql::Connection* connection,
                                  std::uint64_t momentId,
                                  const std::string& viewerUserName) const
 {
     std::unique_ptr<sql::PreparedStatement> statement(
         connection->prepareStatement(
             "SELECT m.momentId, m.authorUserName, m.content, m.visibility, "
-            "m.locationName, m.likeCount, m.commentCount, m.createdAt, "
+            "m.locationName, m.latitude, m.longitude, m.likeCount, m.commentCount, "
+            "m.clientRequestId, m.status, m.createdAt, m.updatedAt, m.deletedAt, "
             "u.nickName, u.avatar, "
             "EXISTS(SELECT 1 FROM momentLike ml WHERE ml.momentId = m.momentId "
             "AND ml.userName = ?) AS isLiked "
@@ -281,65 +298,120 @@ Json::Value MomentDao::getMoment(sql::Connection* connection,
     statement->setString(1, viewerUserName);
     statement->setUInt64(2, momentId);
     std::unique_ptr<sql::ResultSet> result(statement->executeQuery());
-    if (!result->next()) return Json::Value();
+    if (!result->next()) throw std::runtime_error("Moment not found");
 
-    Json::Value moment(Json::objectValue);
-    moment["id"] = Json::UInt64(result->getUInt64("momentId"));
-    moment["authorId"] = result->getString("authorUserName").asStdString();
-    moment["authorName"] = result->getString("nickName").asStdString();
-    moment["authorAvatarUrl"] = result->getString("avatar").asStdString();
-    moment["content"] = result->getString("content").asStdString();
-    moment["visibility"] = result->getUInt("visibility");
+    MomentModel moment;
+    moment.setMomentId(result->getUInt64("momentId"));
+    moment.setAuthorUserName(result->getString("authorUserName").asStdString());
+    moment.setAuthorNickName(result->getString("nickName").asStdString());
+    moment.setAuthorAvatar(result->getString("avatar").asStdString());
+    moment.setContent(result->getString("content").asStdString());
+    moment.setVisibility(static_cast<std::uint8_t>(result->getUInt("visibility")));
     const std::string locationName = result->getString("locationName");
-    moment["location"] = locationName.empty() ? Json::Value() : Json::Value(locationName);
-    moment["likeCount"] = result->getUInt("likeCount");
-    moment["commentCount"] = result->getUInt("commentCount");
-    moment["isLiked"] = result->getBoolean("isLiked");
-    moment["createdAt"] = Json::UInt64(result->getUInt64("createdAt"));
-    appendMedia(connection, momentId, moment);
-    appendComments(connection, momentId, moment);
+    moment.setLocationName(locationName);
+    if (!result->isNull("latitude"))
+    {
+        moment.setLatitude(static_cast<double>(result->getDouble("latitude")));
+    }
+    if (!result->isNull("longitude"))
+    {
+        moment.setLongitude(static_cast<double>(result->getDouble("longitude")));
+    }
+    moment.setLikeCount(result->getUInt("likeCount"));
+    moment.setCommentCount(result->getUInt("commentCount"));
+    if (!result->isNull("clientRequestId"))
+    {
+        moment.setClientRequestId(result->getString("clientRequestId").asStdString());
+    }
+    moment.setStatus(static_cast<std::uint8_t>(result->getUInt("status")));
+    moment.setLikedByViewer(result->getBoolean("isLiked"));
+    moment.setCreatedAt(result->getUInt64("createdAt"));
+    moment.setUpdatedAt(result->getUInt64("updatedAt"));
+    if (!result->isNull("deletedAt"))
+    {
+        moment.setDeletedAt(result->getUInt64("deletedAt"));
+    }
+    moment.setMedia(getMedia(connection, momentId));
+    moment.setComments(getComments(connection, momentId));
     return moment;
 }
 
-void MomentDao::appendMedia(sql::Connection* connection,
-                            std::uint64_t momentId,
-                            Json::Value& moment) const
+std::vector<MomentMediaModel> MomentDao::getMedia(
+    sql::Connection* connection,
+    std::uint64_t momentId) const
 {
     std::unique_ptr<sql::PreparedStatement> statement(
         connection->prepareStatement(
-            "SELECT mediaUrl FROM momentMedia WHERE momentId = ? ORDER BY sortOrder ASC"));
+            "SELECT mediaId, momentId, mediaType, mediaUrl, thumbnailUrl, width, height, "
+            "fileSize, fileHash, sortOrder, createdAt FROM momentMedia "
+            "WHERE momentId = ? ORDER BY sortOrder ASC"));
     statement->setUInt64(1, momentId);
     std::unique_ptr<sql::ResultSet> result(statement->executeQuery());
-    Json::Value media(Json::arrayValue);
+    std::vector<MomentMediaModel> media;
     while (result->next())
     {
-        media.append(result->getString("mediaUrl").asStdString());
+        MomentMediaModel item;
+        item.setMediaId(result->getUInt64("mediaId"));
+        item.setMomentId(result->getUInt64("momentId"));
+        item.setMediaType(static_cast<std::uint8_t>(result->getUInt("mediaType")));
+        item.setMediaUrl(result->getString("mediaUrl").asStdString());
+        if (!result->isNull("thumbnailUrl"))
+        {
+            item.setThumbnailUrl(result->getString("thumbnailUrl").asStdString());
+        }
+        if (!result->isNull("width")) item.setWidth(result->getUInt("width"));
+        if (!result->isNull("height")) item.setHeight(result->getUInt("height"));
+        if (!result->isNull("fileSize")) item.setFileSize(result->getUInt64("fileSize"));
+        if (!result->isNull("fileHash"))
+        {
+            item.setFileHash(result->getString("fileHash").asStdString());
+        }
+        item.setSortOrder(static_cast<std::uint16_t>(result->getUInt("sortOrder")));
+        item.setCreatedAt(result->getUInt64("createdAt"));
+        media.push_back(std::move(item));
     }
-    moment["mediaPaths"] = media;
+    return media;
 }
 
-void MomentDao::appendComments(sql::Connection* connection,
-                               std::uint64_t momentId,
-                               Json::Value& moment) const
+std::vector<MomentCommentModel> MomentDao::getComments(
+    sql::Connection* connection,
+    std::uint64_t momentId) const
 {
     std::unique_ptr<sql::PreparedStatement> statement(
         connection->prepareStatement(
-            "SELECT c.commentId, c.userName, c.content, c.createdAt, u.nickName "
+            "SELECT c.commentId, c.momentId, c.userName, c.replyToCommentId, "
+            "c.replyToUserName, c.content, c.status, c.createdAt, c.updatedAt, "
+            "c.deletedAt, u.nickName "
             "FROM momentComment c JOIN userinfo u ON u.userName = c.userName "
             "WHERE c.momentId = ? AND c.status = 0 "
             "ORDER BY c.createdAt ASC, c.commentId ASC"));
     statement->setUInt64(1, momentId);
     std::unique_ptr<sql::ResultSet> result(statement->executeQuery());
-    Json::Value comments(Json::arrayValue);
+    std::vector<MomentCommentModel> comments;
     while (result->next())
     {
-        Json::Value comment(Json::objectValue);
-        comment["id"] = Json::UInt64(result->getUInt64("commentId"));
-        comment["userId"] = result->getString("userName").asStdString();
-        comment["displayName"] = result->getString("nickName").asStdString();
-        comment["content"] = result->getString("content").asStdString();
-        comment["createdAt"] = Json::UInt64(result->getUInt64("createdAt"));
-        comments.append(comment);
+        MomentCommentModel comment;
+        comment.setCommentId(result->getUInt64("commentId"));
+        comment.setMomentId(result->getUInt64("momentId"));
+        comment.setUserName(result->getString("userName").asStdString());
+        if (!result->isNull("replyToCommentId"))
+        {
+            comment.setReplyToCommentId(result->getUInt64("replyToCommentId"));
+        }
+        if (!result->isNull("replyToUserName"))
+        {
+            comment.setReplyToUserName(result->getString("replyToUserName").asStdString());
+        }
+        comment.setDisplayName(result->getString("nickName").asStdString());
+        comment.setContent(result->getString("content").asStdString());
+        comment.setStatus(static_cast<std::uint8_t>(result->getUInt("status")));
+        comment.setCreatedAt(result->getUInt64("createdAt"));
+        comment.setUpdatedAt(result->getUInt64("updatedAt"));
+        if (!result->isNull("deletedAt"))
+        {
+            comment.setDeletedAt(result->getUInt64("deletedAt"));
+        }
+        comments.push_back(std::move(comment));
     }
-    moment["comments"] = comments;
+    return comments;
 }

@@ -9,6 +9,8 @@
 #include <utility>
 
 #include "MomentDao.h"
+#include "MomentMediaModel.h"
+#include "MomentModel.h"
 
 namespace
 {
@@ -66,6 +68,50 @@ Json::Value successWithData(Json::Value data)
     value["data"] = std::move(data);
     return value;
 }
+
+Json::Value commentToJson(const MomentCommentModel& comment)
+{
+    Json::Value value(Json::objectValue);
+    value["id"] = Json::UInt64(comment.getCommentId());
+    value["userId"] = comment.getUserName();
+    value["displayName"] = comment.getDisplayName();
+    value["content"] = comment.getContent();
+    value["createdAt"] = Json::UInt64(comment.getCreatedAt());
+    return value;
+}
+
+Json::Value momentToJson(const MomentModel& moment)
+{
+    Json::Value value(Json::objectValue);
+    value["id"] = Json::UInt64(moment.getMomentId());
+    value["authorId"] = moment.getAuthorUserName();
+    value["authorName"] = moment.getAuthorNickName();
+    value["authorAvatarUrl"] = moment.getAuthorAvatar();
+    value["content"] = moment.getContent();
+    value["visibility"] = moment.getVisibility();
+    value["location"] = moment.getLocationName().empty()
+        ? Json::Value()
+        : Json::Value(moment.getLocationName());
+    value["likeCount"] = moment.getLikeCount();
+    value["commentCount"] = moment.getCommentCount();
+    value["isLiked"] = moment.isLikedByViewer();
+    value["createdAt"] = Json::UInt64(moment.getCreatedAt());
+
+    Json::Value media(Json::arrayValue);
+    for (const auto& item : moment.getMedia())
+    {
+        media.append(item.getMediaUrl());
+    }
+    value["mediaPaths"] = std::move(media);
+
+    Json::Value comments(Json::arrayValue);
+    for (const auto& comment : moment.getComments())
+    {
+        comments.append(commentToJson(comment));
+    }
+    value["comments"] = std::move(comments);
+    return value;
+}
 }
 
 Json::Value MomentService::publish(const std::string& userName,
@@ -82,30 +128,33 @@ Json::Value MomentService::publish(const std::string& userName,
         return response(101, "Moment content is too long");
     }
 
-    MomentCreateData data;
-    data.authorUserName = userName;
-    data.content = content;
-    data.visibility = request.get("visibility", 0).asUInt();
-    if (data.visibility > 2)
+    MomentModel moment;
+    moment.setAuthorUserName(userName);
+    moment.setContent(content);
+    const auto visibility = request.get("visibility", 0).asUInt();
+    if (visibility > 2)
     {
         return response(101, "Invalid visibility");
     }
-    data.locationName = trim(request.get("location", "").asString());
-    if (utf8CharacterCount(data.locationName) > 100)
+    moment.setVisibility(static_cast<std::uint8_t>(visibility));
+    moment.setLocationName(trim(request.get("location", "").asString()));
+    if (utf8CharacterCount(moment.getLocationName()) > 100)
     {
         return response(101, "Location is too long");
     }
-    data.clientRequestId = request.get("clientRequestId", "").asString();
-    if (data.clientRequestId.size() > 64)
+    moment.setClientRequestId(request.get("clientRequestId", "").asString());
+    if (moment.getClientRequestId().size() > 64)
     {
         return response(101, "Invalid client request id");
     }
+    std::vector<MomentMediaModel> media;
     if (mediaUrls.isArray())
     {
         if (mediaUrls.size() > 9)
         {
             return response(101, "At most 9 media files are allowed");
         }
+        std::uint16_t sortOrder = 0;
         for (const auto& mediaUrl : mediaUrls)
         {
             const std::string url = mediaUrl.asString();
@@ -113,14 +162,22 @@ Json::Value MomentService::publish(const std::string& userName,
             {
                 return response(101, "Invalid media URL");
             }
-            data.mediaUrls.push_back(url);
+            MomentMediaModel item;
+            item.setMediaType(0);
+            item.setMediaUrl(url);
+            item.setSortOrder(sortOrder++);
+            media.push_back(std::move(item));
         }
     }
-    data.createdAt = currentTimeMillis();
+    const auto now = currentTimeMillis();
+    moment.setCreatedAt(now);
+    moment.setUpdatedAt(now);
+    for (auto& item : media) item.setCreatedAt(now);
 
     try
     {
-        return successWithData(MomentDao().createMoment(data));
+        return successWithData(momentToJson(
+            MomentDao().createMoment(std::move(moment), media)));
     }
     catch (const std::exception& error)
     {
@@ -137,9 +194,16 @@ Json::Value MomentService::ownList(const std::string& userName,
         const auto beforeMomentId = readUInt64(request["beforeMomentId"]);
         const auto requestedLimit = request.get("limit", 30).asUInt();
         const auto limit = std::max(1U, std::min(requestedLimit, 50U));
+        const auto moments = MomentDao().getOwnMoments(
+            userName, beforeMomentId, limit);
+        Json::Value items(Json::arrayValue);
+        for (const auto& moment : moments)
+        {
+            items.append(momentToJson(moment));
+        }
         Json::Value result(Json::objectValue);
-        result["items"] = MomentDao().getOwnMoments(userName, beforeMomentId, limit);
-        result["hasMore"] = result["items"].size() == limit;
+        result["items"] = std::move(items);
+        result["hasMore"] = moments.size() == limit;
         return successWithData(std::move(result));
     }
     catch (const std::exception& error)
@@ -156,8 +220,8 @@ Json::Value MomentService::toggleLike(const std::string& userName,
     {
         const auto momentId = readUInt64(request["momentId"]);
         if (momentId == 0) return response(101, "Invalid moment id");
-        return successWithData(MomentDao().toggleLike(
-            momentId, userName, currentTimeMillis()));
+        return successWithData(momentToJson(MomentDao().toggleLike(
+            momentId, userName, currentTimeMillis())));
     }
     catch (const std::exception& error)
     {
@@ -177,8 +241,8 @@ Json::Value MomentService::addComment(const std::string& userName,
         {
             return response(101, "Invalid comment");
         }
-        return successWithData(MomentDao().addComment(
-            momentId, userName, content, currentTimeMillis()));
+        return successWithData(momentToJson(MomentDao().addComment(
+            momentId, userName, content, currentTimeMillis())));
     }
     catch (const std::exception& error)
     {
