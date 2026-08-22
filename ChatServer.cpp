@@ -7,6 +7,7 @@
 #include"ChatManageController.h"
 #include"FriendController.h"
 #include"GroupController.h"
+#include "MomentController.h"
 using namespace drogon;
 
 

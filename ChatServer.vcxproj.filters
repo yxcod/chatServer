@@ -47,6 +47,9 @@
     <ClInclude Include="LoginModel.h">
       <Filter>源文件\Model</Filter>
     </ClInclude>
+    <ClInclude Include="MomentController.h" />
+    <ClInclude Include="MomentDao.h" />
+    <ClInclude Include="MomentService.h" />
     <ClInclude Include="UserLoginService.h">
       <Filter>源文件\Service</Filter>
     </ClInclude>
@@ -169,6 +172,8 @@
     <ClCompile Include="LoginModel.cpp">
       <Filter>源文件\Model</Filter>
     </ClCompile>
+    <ClCompile Include="MomentDao.cpp" />
+    <ClCompile Include="MomentService.cpp" />
     <ClCompile Include="UserLoginService.cpp">
       <Filter>源文件\Service</Filter>
     </ClCompile>

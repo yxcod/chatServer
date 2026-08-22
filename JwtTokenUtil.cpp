@@ -1,8 +1,8 @@
 #include "JwtTokenUtil.h"
-#include <openssl/hmac.h>   // HMAC-SHA256 Ç©Ãû
-#include <openssl/bio.h>    // Base64 ±àÂë½âÂë
-#include <openssl/evp.h>    // ¼ÓÃÜËã·¨ÉÏÏÂÎÄ
-#include <openssl/sha.h>  // ±ØĞë°üº¬ÕâĞĞ£¡
+#include <openssl/hmac.h>   // HMAC-SHA256 ç­¾å
+#include <openssl/bio.h>    // Base64 ç¼–ç è§£ç 
+#include <openssl/evp.h>    // åŠ å¯†ç®—æ³•ä¸Šä¸‹æ–‡
+#include <openssl/sha.h>  // å¿…é¡»åŒ…å«è¿™è¡Œï¼
 #include <openssl/md5.h>
 #include <openssl/rand.h>
 #include <openssl/hmac.h>
@@ -11,30 +11,30 @@
 #include <sstream>
 #include <algorithm>
 
-// ¹¹Ôìº¯Êı£º³õÊ¼»¯ÃÜÔ¿ºÍ¹ıÆÚÊ±¼ä
+// æ„é€ å‡½æ•°ï¼šåˆå§‹åŒ–å¯†é’¥å’Œè¿‡æœŸæ—¶é—´
 JwtTokenUtil::JwtTokenUtil(std::string secretKey, uint64_t expireSeconds)
     : m_secretKey(std::move(secretKey)),
     m_expireSeconds(expireSeconds),
     m_algorithm("HS256") {
-    // Ğ£ÑéÃÜÔ¿ÓĞĞ§ĞÔ£¨ÃÜÔ¿Îª¿Õ»ò¹ı¶Ì»áµ¼ÖÂÇ©Ãû²»°²È«£©
+    // æ ¡éªŒå¯†é’¥æœ‰æ•ˆæ€§ï¼ˆå¯†é’¥ä¸ºç©ºæˆ–è¿‡çŸ­ä¼šå¯¼è‡´ç­¾åä¸å®‰å…¨ï¼‰
     if (m_secretKey.empty() || m_secretKey.length() < 16) {
         throw std::invalid_argument("JWT secret key must be at least 16 characters long");
     }
 }
 
 /**
- * Éú³É JWT Token£¨Í¨ÓÃ·½·¨£¬Ö§³Ö×Ô¶¨ÒåÔØºÉ£©
+ * ç”Ÿæˆ JWT Tokenï¼ˆé€šç”¨æ–¹æ³•ï¼Œæ”¯æŒè‡ªå®šä¹‰è½½è·ï¼‰
  */
 std::string JwtTokenUtil::generateToken(const std::unordered_map<std::string, std::string>& payload) {
-    // ²½Öè1£º¹¹½¨ Header£¨¹Ì¶¨¸ñÊ½£¬ÉùÃ÷Ëã·¨ºÍ Token ÀàĞÍ£©
+    // æ­¥éª¤1ï¼šæ„å»º Headerï¼ˆå›ºå®šæ ¼å¼ï¼Œå£°æ˜ç®—æ³•å’Œ Token ç±»å‹ï¼‰
     std::string header = R"({"alg":")" + m_algorithm + R"(","typ":"JWT"})";
     std::string encodedHeader = base64UrlEncode(header);
 
-    // ²½Öè2£º¹¹½¨ Payload£¨×Ô¶¨ÒåÊı¾İ + ¹ıÆÚÊ±¼ä£©
+    // æ­¥éª¤2ï¼šæ„å»º Payloadï¼ˆè‡ªå®šä¹‰æ•°æ® + è¿‡æœŸæ—¶é—´ï¼‰
     std::ostringstream payloadStream;
     payloadStream << "{";
 
-    // Ìí¼Ó×Ô¶¨ÒåÔØºÉ£¨Èç userId¡¢deviceId µÈ£©
+    // æ·»åŠ è‡ªå®šä¹‰è½½è·ï¼ˆå¦‚ userIdã€deviceId ç­‰ï¼‰
     for (auto it = payload.begin(); it != payload.end(); ++it) {
         if (it != payload.begin()) {
             payloadStream << ",";
@@ -42,7 +42,7 @@ std::string JwtTokenUtil::generateToken(const std::unordered_map<std::string, st
         payloadStream << "\"" << it->first << "\":\"" << it->second << "\"";
     }
 
-    // Ìí¼Ó¹ıÆÚÊ±¼ä£¨exp£ºµ±Ç°Ê±¼ä´Á + ¹ıÆÚÃëÊı£©
+    // æ·»åŠ è¿‡æœŸæ—¶é—´ï¼ˆexpï¼šå½“å‰æ—¶é—´æˆ³ + è¿‡æœŸç§’æ•°ï¼‰
     auto now = std::chrono::system_clock::now();
     uint64_t timestamp = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
     uint64_t exp = timestamp + m_expireSeconds;
@@ -52,16 +52,16 @@ std::string JwtTokenUtil::generateToken(const std::unordered_map<std::string, st
     std::string payloadStr = payloadStream.str();
     std::string encodedPayload = base64UrlEncode(payloadStr);
 
-    // ²½Öè3£ºÉú³ÉÇ©Ãû£¨Header.Payload + ÃÜÔ¿ ¡ú HMAC-SHA256 Ç©Ãû£©
+    // æ­¥éª¤3ï¼šç”Ÿæˆç­¾åï¼ˆHeader.Payload + å¯†é’¥ â†’ HMAC-SHA256 ç­¾åï¼‰
     std::string data = encodedHeader + "." + encodedPayload;
     std::string signature = hmacSha256Sign(data);
 
-    // ²½Öè4£º×é×° Token£¨Header.Payload.Signature£©
+    // æ­¥éª¤4ï¼šç»„è£… Tokenï¼ˆHeader.Payload.Signatureï¼‰
     return encodedHeader + "." + encodedPayload + "." + signature;
 }
 
 /**
- * ÖØÔØ£ºÉú³É Token£¨µÇÂ¼³¡¾°×¨ÓÃ£¬Ö±½Ó´« userId ºÍ deviceId£©
+ * é‡è½½ï¼šç”Ÿæˆ Tokenï¼ˆç™»å½•åœºæ™¯ä¸“ç”¨ï¼Œç›´æ¥ä¼  userId å’Œ deviceIdï¼‰
  */
 std::string JwtTokenUtil::generateToken(std::string userId, const std::string& deviceId) {
     std::unordered_map<std::string, std::string> payload;
@@ -73,59 +73,59 @@ std::string JwtTokenUtil::generateToken(std::string userId, const std::string& d
 }
 
 /**
- * ÑéÖ¤ Token ÓĞĞ§ĞÔ£¨Ç©ÃûÕıÈ· + Î´¹ıÆÚ£©ºó¶ËÎŞĞè±£´ætokenÄÃµ½Ç°¶Ë·µ»ØµÄtoken¿ÉÒÔÖ±½ÓÅĞ¶ÏÊÇ·ñÕıÈ·
- * JWT µÄverifyTokenÖ»ÑéÖ¤ ¡°Token ÊÇ·ñÊÇºó¶ËÇ©·¢¡¢Î´´Û¸Ä¡¢Î´¹ıÆÚ¡±£¬µ«²»ÑéÖ¤ 
- * ¡°µ±Ç°ÇëÇóÕßÊÇ·ñÊÇ Token µÄÕæÕıËùÓĞÕß¡±¡ª¡ª ÕâĞèÒªÄãÔÚÒµÎñ²ã²¹³ä ¡°È¨ÏŞ°ó¶¨Ğ£Ñé¡±£¬¶ø²»ÊÇÒÀÀµ Token ±¾Éí¡£
+ * éªŒè¯ Token æœ‰æ•ˆæ€§ï¼ˆç­¾åæ­£ç¡® + æœªè¿‡æœŸï¼‰åç«¯æ— éœ€ä¿å­˜tokenæ‹¿åˆ°å‰ç«¯è¿”å›çš„tokenå¯ä»¥ç›´æ¥åˆ¤æ–­æ˜¯å¦æ­£ç¡®
+ * JWT çš„verifyTokenåªéªŒè¯ â€œToken æ˜¯å¦æ˜¯åç«¯ç­¾å‘ã€æœªç¯¡æ”¹ã€æœªè¿‡æœŸâ€ï¼Œä½†ä¸éªŒè¯
+ * â€œå½“å‰è¯·æ±‚è€…æ˜¯å¦æ˜¯ Token çš„çœŸæ­£æ‰€æœ‰è€…â€â€”â€” è¿™éœ€è¦ä½ åœ¨ä¸šåŠ¡å±‚è¡¥å…… â€œæƒé™ç»‘å®šæ ¡éªŒâ€ï¼Œè€Œä¸æ˜¯ä¾èµ– Token æœ¬èº«ã€‚
  * 
  */
 bool JwtTokenUtil::verifyToken(const std::string& token) {
-    // ·Ö¸î Token Îª Header.Payload.Signature£¨±ØĞë°üº¬Á½¸ö "."£©
+    // åˆ†å‰² Token ä¸º Header.Payload.Signatureï¼ˆå¿…é¡»åŒ…å«ä¸¤ä¸ª "."ï¼‰
     size_t firstDot = token.find('.');
     size_t secondDot = token.find('.', firstDot + 1);
     if (firstDot == std::string::npos || secondDot == std::string::npos || secondDot == token.length() - 1) {
-        return false; // Token ¸ñÊ½´íÎó
+        return false; // Token æ ¼å¼é”™è¯¯
     }
 
-    // ÌáÈ¡Èı²¿·Ö
+    // æå–ä¸‰éƒ¨åˆ†
     std::string encodedHeader = token.substr(0, firstDot);
     std::string encodedPayload = token.substr(firstDot + 1, secondDot - firstDot - 1);
     std::string signature = token.substr(secondDot + 1);
 
-    // ²½Öè1£ºÑéÖ¤Ç©Ãû
+    // æ­¥éª¤1ï¼šéªŒè¯ç­¾å
     std::string data = encodedHeader + "." + encodedPayload;
     if (!verifySignature(data, signature)) {
-        return false; // Ç©Ãû´íÎó
+        return false; // ç­¾åé”™è¯¯
     }
 
-    // ²½Öè2£º½âÎö Payload£¬¼ì²é¹ıÆÚÊ±¼ä
+    // æ­¥éª¤2ï¼šè§£æ Payloadï¼Œæ£€æŸ¥è¿‡æœŸæ—¶é—´
     std::string payloadStr = base64UrlDecode(encodedPayload);
     if (payloadStr.empty()) {
-        return false; // Payload ½âÂëÊ§°Ü
+        return false; // Payload è§£ç å¤±è´¥
     }
 
-    // ÌáÈ¡ exp ×Ö¶Î£¨¼òµ¥ JSON ½âÎö£¬ÊÊÓÃÓÚ¹Ì¶¨¸ñÊ½µÄ Payload£©
+    // æå– exp å­—æ®µï¼ˆç®€å• JSON è§£æï¼Œé€‚ç”¨äºå›ºå®šæ ¼å¼çš„ Payloadï¼‰
     size_t expStart = payloadStr.find("\"exp\":\"");
     size_t expEnd = payloadStr.find("\"", expStart + 7);
     if (expStart == std::string::npos || expEnd == std::string::npos) {
-        return false; // È±ÉÙ exp ×Ö¶Î
+        return false; // ç¼ºå°‘ exp å­—æ®µ
     }
 
     std::string exp = payloadStr.substr(expStart + 7, expEnd - (expStart + 7));
-    return isTokenNotExpired(exp); // ¼ì²éÊÇ·ñ¹ıÆÚ
+    return isTokenNotExpired(exp); // æ£€æŸ¥æ˜¯å¦è¿‡æœŸ
 }
 
 /**
- * ½âÎö Token ÖĞµÄÔØºÉÊı¾İ
+ * è§£æ Token ä¸­çš„è½½è·æ•°æ®
  */
 std::unordered_map<std::string, std::string> JwtTokenUtil::parsePayload(const std::string& token) {
     std::unordered_map<std::string, std::string> payload;
 
-    // ÏÈÑéÖ¤ Token ÓĞĞ§ĞÔ£¨ÎŞĞ§Ôò·µ»Ø¿Õ£©
+    // å…ˆéªŒè¯ Token æœ‰æ•ˆæ€§ï¼ˆæ— æ•ˆåˆ™è¿”å›ç©ºï¼‰
     if (!verifyToken(token)) {
         return payload;
     }
 
-    // ·Ö¸î²¢½âÂë Payload
+    // åˆ†å‰²å¹¶è§£ç  Payload
     size_t firstDot = token.find('.');
     size_t secondDot = token.find('.', firstDot + 1);
     std::string encodedPayload = token.substr(firstDot + 1, secondDot - firstDot - 1);
@@ -134,27 +134,27 @@ std::unordered_map<std::string, std::string> JwtTokenUtil::parsePayload(const st
         return payload;
     }
 
-    // ¼òµ¥ JSON ½âÎö£¨ÊÊÓÃÓÚ key-value ¾ùÎª×Ö·û´®µÄ³¡¾°£¬ÎŞĞèÒÀÀµ JSON ¿â£©
-    // ÒÆ³ıÇ°ºó {}
+    // ç®€å• JSON è§£æï¼ˆé€‚ç”¨äº key-value å‡ä¸ºå­—ç¬¦ä¸²çš„åœºæ™¯ï¼Œæ— éœ€ä¾èµ– JSON åº“ï¼‰
+    // ç§»é™¤å‰å {}
     if (payloadStr.front() == '{' && payloadStr.back() == '}') {
         payloadStr = payloadStr.substr(1, payloadStr.length() - 2);
     }
 
-    // ·Ö¸î¼üÖµ¶Ô£¨°´ , ·Ö¸î£©
+    // åˆ†å‰²é”®å€¼å¯¹ï¼ˆæŒ‰ , åˆ†å‰²ï¼‰
     std::stringstream ss(payloadStr);
     std::string pair;
     while (std::getline(ss, pair, ',')) {
-        // ·Ö¸î key ºÍ value£¨°´ : ·Ö¸î£©
+        // åˆ†å‰² key å’Œ valueï¼ˆæŒ‰ : åˆ†å‰²ï¼‰
         size_t colon = pair.find(':');
         if (colon == std::string::npos) {
             continue;
         }
 
-        // ÌáÈ¡ key£¨È¥³ıÇ°ºó "£©
+        // æå– keyï¼ˆå»é™¤å‰å "ï¼‰
         std::string key = pair.substr(0, colon);
         key.erase(std::remove(key.begin(), key.end(), '"'), key.end());
 
-        // ÌáÈ¡ value£¨È¥³ıÇ°ºó "£©
+        // æå– valueï¼ˆå»é™¤å‰å "ï¼‰
         std::string value = pair.substr(colon + 1);
         value.erase(std::remove(value.begin(), value.end(), '"'), value.end());
 
@@ -165,7 +165,7 @@ std::unordered_map<std::string, std::string> JwtTokenUtil::parsePayload(const st
 }
 
 /**
- * ¿ì½İ·½·¨£º´Ó Token ÖĞ½âÎöÓÃ»§ID
+ * å¿«æ·æ–¹æ³•ï¼šä» Token ä¸­è§£æç”¨æˆ·ID
  */
 uint64_t JwtTokenUtil::parseUserIdFromToken(const std::string& token) {
     auto payload = parsePayload(token);
@@ -183,20 +183,20 @@ uint64_t JwtTokenUtil::parseUserIdFromToken(const std::string& token) {
 
 std::optional<std::string> JwtTokenUtil::extractBearerToken(const HttpRequestPtr& req)
 {
-	// 1. »ñÈ¡ Authorization Í·
+	// 1. è·å– Authorization å¤´
 	auto authHeader = req->getHeader("Authorization");
 	if (authHeader.empty()) {
-		return std::nullopt; // Í·²»´æÔÚ
+		return std::nullopt; // å¤´ä¸å­˜åœ¨
 	}
 
-	// 2. ÕıÔòÆ¥Åä Bearer Token ¸ñÊ½£¨ºöÂÔ´óĞ¡Ğ´£¬Ö§³Ö¿Õ¸ñ·Ö¸ô£©
+	// 2. æ­£åˆ™åŒ¹é… Bearer Token æ ¼å¼ï¼ˆå¿½ç•¥å¤§å°å†™ï¼Œæ”¯æŒç©ºæ ¼åˆ†éš”ï¼‰
     std::regex pattern(R"(^Bearer\s+(.+)$)", std::regex_constants::icase);
     std::smatch matchResult;
 	if (!regex_match(authHeader, matchResult, pattern)) {
-		return std::nullopt; // ¸ñÊ½´íÎó£¨²»ÊÇ Bearer ÀàĞÍ£©
+		return std::nullopt; // æ ¼å¼é”™è¯¯ï¼ˆä¸æ˜¯ Bearer ç±»å‹ï¼‰
 	}
 
-	// 3. ÌáÈ¡Æ¥Åäµ½µÄ token£¨µÚÒ»¸ö×ÓÆ¥ÅäÏî£©
+	// 3. æå–åŒ¹é…åˆ°çš„ tokenï¼ˆç¬¬ä¸€ä¸ªå­åŒ¹é…é¡¹ï¼‰
 	if (matchResult.size() < 2) {
 		return std::nullopt;
 	}
@@ -204,30 +204,30 @@ std::optional<std::string> JwtTokenUtil::extractBearerToken(const HttpRequestPtr
 }
 
 /**
- * Base64 URL ±àÂë£¨JWT ×¨ÓÃ£©
- * ±ê×¼ Base64 Ìæ»»¹æÔò£º+ ¡ú -, / ¡ú _, = ¡ú È¥³ı
+ * Base64 URL ç¼–ç ï¼ˆJWT ä¸“ç”¨ï¼‰
+ * æ ‡å‡† Base64 æ›¿æ¢è§„åˆ™ï¼š+ â†’ -, / â†’ _, = â†’ å»é™¤
  */
 std::string JwtTokenUtil::base64UrlEncode(const std::string& data) {
     BIO* bio = BIO_new(BIO_f_base64());
     BIO* mem = BIO_new(BIO_s_mem());
     bio = BIO_push(bio, mem);
 
-    // ½ûÓÃ Base64 »»ĞĞ·û£¨Ä¬ÈÏÃ¿ 64 ×Ö·û»»ĞĞ£¬JWT ²»ÔÊĞí£©
+    // ç¦ç”¨ Base64 æ¢è¡Œç¬¦ï¼ˆé»˜è®¤æ¯ 64 å­—ç¬¦æ¢è¡Œï¼ŒJWT ä¸å…è®¸ï¼‰
     BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL);
 
-    // Ğ´ÈëÊı¾İ²¢Ë¢ĞÂ
+    // å†™å…¥æ•°æ®å¹¶åˆ·æ–°
     BIO_write(bio, data.c_str(), static_cast<int>(data.length()));
     BIO_flush(bio);
 
-    // ¶ÁÈ¡±àÂë½á¹û
+    // è¯»å–ç¼–ç ç»“æœ
     char* buf = nullptr;
     long len = BIO_get_mem_data(bio, &buf);
     std::string encoded(buf, len);
 
-    // ÊÍ·Å×ÊÔ´
+    // é‡Šæ”¾èµ„æº
     BIO_free_all(bio);
 
-    // Ìæ»»×Ö·û£º+ ¡ú -, / ¡ú _, È¥³ı =
+    // æ›¿æ¢å­—ç¬¦ï¼š+ â†’ -, / â†’ _, å»é™¤ =
     std::replace(encoded.begin(), encoded.end(), '+', '-');
     std::replace(encoded.begin(), encoded.end(), '/', '_');
     encoded.erase(std::remove(encoded.begin(), encoded.end(), '='), encoded.end());
@@ -236,85 +236,87 @@ std::string JwtTokenUtil::base64UrlEncode(const std::string& data) {
 }
 
 /**
- * Base64 URL ½âÂë
+ * Base64 URL è§£ç 
  */
 std::string JwtTokenUtil::base64UrlDecode(const std::string& data) {
-    // »¹Ô­×Ö·û£º- ¡ú +, _ ¡ú /, ²¹³ä = Ê¹³¤¶ÈÎª 4 µÄ±¶Êı
+    // è¿˜åŸå­—ç¬¦ï¼š- â†’ +, _ â†’ /, è¡¥å…… = ä½¿é•¿åº¦ä¸º 4 çš„å€æ•°
     std::string decodedData = data;
     std::replace(decodedData.begin(), decodedData.end(), '-', '+');
     std::replace(decodedData.begin(), decodedData.end(), '_', '/');
 
-    // ²¹³ä =£¨Base64 ½âÂëÒªÇó³¤¶ÈÎª 4 µÄ±¶Êı£©
+    // è¡¥å…… =ï¼ˆBase64 è§£ç è¦æ±‚é•¿åº¦ä¸º 4 çš„å€æ•°ï¼‰
     size_t remainder = decodedData.length() % 4;
     if (remainder != 0) {
         decodedData.append(4 - remainder, '=');
     }
 
-    // Base64 ½âÂë
-    BIO* bio = BIO_new(BIO_f_base64());
-    BIO* mem = BIO_new(BIO_s_mem());
-    bio = BIO_push(bio, mem);
+    BIO* base64 = BIO_new(BIO_f_base64());
+    BIO* memory = BIO_new_mem_buf(
+        decodedData.data(), static_cast<int>(decodedData.size()));
+    if (base64 == nullptr || memory == nullptr) {
+        if (base64 != nullptr) BIO_free(base64);
+        if (memory != nullptr) BIO_free(memory);
+        return {};
+    }
+    BIO_set_flags(base64, BIO_FLAGS_BASE64_NO_NL);
+    BIO* chain = BIO_push(base64, memory);
 
-    // ½ûÓÃ»»ĞĞ·û
-    BIO_set_flags(bio, BIO_FLAGS_BASE64_NO_NL);
-
-    // Ğ´Èë±àÂëÊı¾İ
-    BIO_write(bio, decodedData.c_str(), static_cast<int>(decodedData.length()));
-    BIO_flush(bio);
-
-    // ¶ÁÈ¡½âÂë½á¹û
-    char* buf = nullptr;
-    long len = BIO_get_mem_data(bio, &buf);
-    std::string result(buf, len);
-
-    // ÊÍ·Å×ÊÔ´
-    BIO_free_all(bio);
-
+    std::string result(decodedData.size(), '\0');
+    const int length = BIO_read(
+        chain, result.data(), static_cast<int>(result.size()));
+    BIO_free_all(chain);
+    if (length <= 0) {
+        return {};
+    }
+    result.resize(static_cast<std::size_t>(length));
     return result;
 }
 
 /**
- * HMAC-SHA256 Ç©Ãû£¨·µ»Ø Base64 URL ±àÂë½á¹û£©
+ * HMAC-SHA256 ç­¾åï¼ˆè¿”å› Base64 URL ç¼–ç ç»“æœï¼‰
  */
 std::string JwtTokenUtil::hmacSha256Sign(const std::string& data) {
     unsigned char hash[SHA256_DIGEST_LENGTH];
     unsigned int hashLen = 0;
 
-    // Éú³É HMAC-SHA256 Ç©Ãû
+    // ç”Ÿæˆ HMAC-SHA256 ç­¾å
     HMAC(EVP_sha256(),
         m_secretKey.c_str(), static_cast<int>(m_secretKey.length()),
         reinterpret_cast<const unsigned char*>(data.c_str()), data.length(),
         hash, &hashLen);
 
-    // Ç©Ãû½á¹û×ªÎª×Ö·û´®£¬ÔÙ½øĞĞ Base64 URL ±àÂë
+    // ç­¾åç»“æœè½¬ä¸ºå­—ç¬¦ä¸²ï¼Œå†è¿›è¡Œ Base64 URL ç¼–ç 
     std::string signature(reinterpret_cast<char*>(hash), hashLen);
     return base64UrlEncode(signature);
 }
 
 /**
- * ÑéÖ¤Ç©Ãû£¨¶Ô±ÈÉú³ÉµÄÇ©ÃûÓë Token ÖĞµÄÇ©Ãû£©
+ * éªŒè¯ç­¾åï¼ˆå¯¹æ¯”ç”Ÿæˆçš„ç­¾åä¸ Token ä¸­çš„ç­¾åï¼‰
  */
 bool JwtTokenUtil::verifySignature(const std::string& data, const std::string& signature) {
-    // ÓÃÏàÍ¬Êı¾İºÍÃÜÔ¿Éú³ÉÇ©Ãû
+    // ç”¨ç›¸åŒæ•°æ®å’Œå¯†é’¥ç”Ÿæˆç­¾å
     std::string expectedSignature = hmacSha256Sign(data);
-    // ¶Ô±ÈÇ©Ãû£¨Ê±¼äºã¶¨±È½Ï£¬·ÀÖ¹¼ÆÊ±¹¥»÷£©
+    if (expectedSignature.size() != signature.size()) {
+        return false;
+    }
+    // å¯¹æ¯”ç­¾åï¼ˆæ—¶é—´æ’å®šæ¯”è¾ƒï¼Œé˜²æ­¢è®¡æ—¶æ”»å‡»ï¼‰
     return CRYPTO_memcmp(expectedSignature.c_str(), signature.c_str(), expectedSignature.length()) == 0;
 }
 
 /**
- * ¼ì²é Token ÊÇ·ñ¹ıÆÚ
+ * æ£€æŸ¥ Token æ˜¯å¦è¿‡æœŸ
  */
 bool JwtTokenUtil::isTokenNotExpired(const std::string& exp) {
     try {
-        // ½âÎö exp ÎªÊ±¼ä´Á£¨Ãë£©
+        // è§£æ exp ä¸ºæ—¶é—´æˆ³ï¼ˆç§’ï¼‰
         uint64_t expTimestamp = std::stoull(exp);
-        // »ñÈ¡µ±Ç°Ê±¼ä´Á
+        // è·å–å½“å‰æ—¶é—´æˆ³
         auto now = std::chrono::system_clock::now();
         uint64_t currentTimestamp = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
-        // Î´¹ıÆÚ = µ±Ç°Ê±¼ä < ¹ıÆÚÊ±¼ä
+        // æœªè¿‡æœŸ = å½“å‰æ—¶é—´ < è¿‡æœŸæ—¶é—´
         return currentTimestamp < expTimestamp;
     }
     catch (...) {
-        return false; // exp ¸ñÊ½´íÎó£¬ÊÓÎª¹ıÆÚ
+        return false; // exp æ ¼å¼é”™è¯¯ï¼Œè§†ä¸ºè¿‡æœŸ
     }
 }
