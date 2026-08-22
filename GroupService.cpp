@@ -1,9 +1,10 @@
 #include "GroupService.h"
 #include"Logger.h"
 #include "UserInfoDao.h"
+#include <algorithm>
 Json::Value GroupService::getAllGroups(const Json::Value& groupInfo)
 {
-	// »ñÈ¡ÓÃ»§ËùÓĞÈº×éĞÅÏ¢
+	// è·å–ç”¨æˆ·æ‰€æœ‰ç¾¤ç»„ä¿¡æ¯
 	Json::Value response;
 	GroupChatDao groupDao;
 	std::string userId = groupInfo["userName"].asString();
@@ -37,7 +38,7 @@ Json::Value GroupService::getAllGroups(const Json::Value& groupInfo)
 Json::Value GroupService::getGroupMembers(const Json::Value& groupInfo)
 {
 	Json::Value response;
-	response["code"] = 101; // Ä¬ÈÏÊ§°Ü
+	response["code"] = 101; // é»˜è®¤å¤±è´¥
 	int groupId = groupInfo["groupId"].asInt();
 	if (groupId <= 0)
 	{
@@ -51,7 +52,7 @@ Json::Value GroupService::getGroupMembers(const Json::Value& groupInfo)
 
 	if (members.empty())
 	{
-		// Ã»ÓĞ³ÉÔ±Ò²ÊÓÎª³É¹¦£¬Ö»ÊÇÁĞ±íÎª¿Õ
+		// æ²¡æœ‰æˆå‘˜ä¹Ÿè§†ä¸ºæˆåŠŸï¼Œåªæ˜¯åˆ—è¡¨ä¸ºç©º
 		response["code"] = 100;
 		response["groupId"] = Json::UInt64(groupId64);
 		response["members"] = Json::Value(Json::arrayValue);
@@ -67,10 +68,10 @@ Json::Value GroupService::getGroupMembers(const Json::Value& groupInfo)
 		item["id"] = Json::UInt64(m.getId());
 		item["groupId"] = Json::UInt64(m.getGroupId());
 		item["userId"] = m.getUserId();
-		item["role"] = static_cast<int>(m.getRole());              // 0-ÆÕÍ¨ 1-¹ÜÀíÔ± 2-ÈºÖ÷
+		item["role"] = static_cast<int>(m.getRole());              // 0-æ™®é€š 1-ç®¡ç†å‘˜ 2-ç¾¤ä¸»
 		item["joinTime"] = Json::UInt64(m.getJoinTime());
 		item["quitTime"] = Json::UInt64(m.getQuitTime());
-		item["isQuit"] = static_cast<int>(m.getIsQuit());          // 0-Î´ÍË³ö 1-ÒÑÍË³ö
+		item["isQuit"] = static_cast<int>(m.getIsQuit());          // 0-æœªé€€å‡º 1-å·²é€€å‡º
 		item["groupNickName"] = m.getGroupNickName();
 		item["avatar"] = userInfo.getAvatar();
 		arr.append(item);
@@ -89,13 +90,15 @@ Json::Value GroupService::getGroupChatRecord(const Json::Value& groupInfo)
 	int groupId = groupInfo["groupId"].asInt();
 	uint64_t groupId64 = static_cast<uint64_t>(groupId);
 
-	// 2. ²éÑ¯¸ÃÈºËùÓĞÏûÏ¢
+	// 2. æŸ¥è¯¢è¯¥ç¾¤æ‰€æœ‰æ¶ˆæ¯
 	GroupMessageDao msgDao;
-	// »ñÈ¡×î½ü limit Ìõ¼ÇÂ¼
-	std::size_t limit = groupInfo["limit"].asInt();
+	// è·å–æœ€è¿‘ limit æ¡è®°å½•
+	int requestedLimit = groupInfo.get("limit", 100).asInt();
+	std::size_t limit = static_cast<std::size_t>(
+		std::max(1, std::min(requestedLimit, 200)));
 	auto messages = msgDao.getRecentMessages(groupId64, limit);
 
-	// 3. ÎªÃ¿ÌõÏûÏ¢²éÒÑ¶ÁĞÅÏ¢
+	// 3. ä¸ºæ¯æ¡æ¶ˆæ¯æŸ¥å·²è¯»ä¿¡æ¯
 	GroupMsgReadDao readDao;
 
 	Json::Value msgArray(Json::arrayValue);
@@ -112,7 +115,7 @@ Json::Value GroupService::getGroupChatRecord(const Json::Value& groupInfo)
 		msgJson["isDeleted"] = static_cast<int>(m.getIsDeleted());
 		msgJson["isRead"] = static_cast<int>(m.getIsRead());
 
-		// 3.1 Ò»´Î²éÑ¯ÍêÕûÔÄ¶Á×´Ì¬£¬ÔÙ²ğ·ÖÎªÒÑ¶ÁºÍÎ´¶ÁÓÃ»§¡£
+		// 3.1 ä¸€æ¬¡æŸ¥è¯¢å®Œæ•´é˜…è¯»çŠ¶æ€ï¼Œå†æ‹†åˆ†ä¸ºå·²è¯»å’Œæœªè¯»ç”¨æˆ·ã€‚
 		auto readStatuses = readDao.getReadStatusesByMsg(m.getMsgId());
 		Json::Value readArray(Json::arrayValue);
 		Json::Value unreadArray(Json::arrayValue);
@@ -163,10 +166,10 @@ Json::Value GroupService::getGroupConversations(const Json::Value& userInfo)
 		msgJson["updateTime"] = Json::UInt64(convs.getUpdateTime());
 		msgJson["lastSenderId"] = convs.getLastSenderId();
 		msgJson["lastMsg"] = convs.getLastMsg();
-		//Í¼Æ¬ĞÅÏ¢
+		//å›¾ç‰‡ä¿¡æ¯
 		if (convs.getMsgType() == 1)
 		{
-			msgJson["lastMsg"] ="[Í¼Æ¬]";
+			msgJson["lastMsg"] ="[å›¾ç‰‡]";
 		}
 		msgJson["unreadCount"] = msgDao.getUnreadCountByUserAndGroup(userId, convs.getGroupId());
 		msgArray.append(msgJson);
@@ -194,7 +197,7 @@ Json::Value GroupService::createGroup(const Json::Value& groupInfo)
 	group.setMaxMembers(200);
 	group.setCreatorId(userId);
 	response["code"] = 101;
-	//ÈºIDÖØ¸´
+	//ç¾¤IDé‡å¤
 	if (groupDao.groupExists(groupId))
 	{
 		response["code"] = 102;
@@ -207,16 +210,16 @@ Json::Value GroupService::createGroup(const Json::Value& groupInfo)
 	GroupMemberModel member;
 	member.setGroupId(static_cast<uint64_t>(groupId));
 	member.setUserId(userId);
-	member.setRole(2); //ÈºÖ÷
+	member.setRole(2); //ç¾¤ä¸»
 	member.setJoinTime(Logger::GetInstance().getcurrentTime());
 	member.setIsQuit(0);
 	member.setQuitTime(0);
 	member.setGroupNickName(userInfo.getNickName());
-	//´´½¨³É¹¦
+	//åˆ›å»ºæˆåŠŸ
 	if (groupDao.createGroup(group) > 0 && groupMemberDao.addMember(member) > 0)
 	{
 		response["code"] = 100;
-		//´´½¨ÈºÊı¾İ´æ´¢Ä¿Â¼
+		//åˆ›å»ºç¾¤æ•°æ®å­˜å‚¨ç›®å½•
 		Logger::GetInstance().createDataDirectories(std::to_string(groupId));
 	}
 	
@@ -226,9 +229,9 @@ Json::Value GroupService::createGroup(const Json::Value& groupInfo)
 Json::Value GroupService::addGroupMember(const Json::Value& memberInfo)
 {
 	Json::Value response;
-	response["code"] = 101; // Ä¬ÈÏÊ§°Ü
+	response["code"] = 101; // é»˜è®¤å¤±è´¥
 
-	// 1. »ù±¾²ÎÊıĞ£Ñé£º±ØĞëÓĞ groupId ºÍ users£¨Êı×é£©
+	// 1. åŸºæœ¬å‚æ•°æ ¡éªŒï¼šå¿…é¡»æœ‰ groupId å’Œ usersï¼ˆæ•°ç»„ï¼‰
 	if (!memberInfo["userNames"].isArray())
 	{
 		response["msg"] = "missing groupId or users(array)";
@@ -254,7 +257,7 @@ Json::Value GroupService::addGroupMember(const Json::Value& memberInfo)
 	GroupMemberDao groupMemberDao;
 	UserInfoDao userInfoDao;
 
-	// 2. ¼ì²éÈºÊÇ·ñ´æÔÚ
+	// 2. æ£€æŸ¥ç¾¤æ˜¯å¦å­˜åœ¨
 	if (!groupChatDao.groupExists(groupId64))
 	{
 		response["code"] = 102;
@@ -262,7 +265,7 @@ Json::Value GroupService::addGroupMember(const Json::Value& memberInfo)
 		return response;
 	}
 
-	// 3. Öğ¸ö´¦ÀíÓÃ»§
+	// 3. é€ä¸ªå¤„ç†ç”¨æˆ·
 	Json::Value resultArray(Json::arrayValue);
 	bool anySuccess = false;
 
@@ -288,7 +291,7 @@ Json::Value GroupService::addGroupMember(const Json::Value& memberInfo)
 			continue;
 		}
 
-		// ÒÑÔÚÈºÖĞ£¨Î´ÍË³ö£©
+		// å·²åœ¨ç¾¤ä¸­ï¼ˆæœªé€€å‡ºï¼‰
 		if (groupMemberDao.isUserInGroup(groupId64, userId))
 		{
 			itemResult["code"] = 103;
@@ -297,13 +300,13 @@ Json::Value GroupService::addGroupMember(const Json::Value& memberInfo)
 			continue;
 		}
 
-		// »ñÈ¡ÓÃ»§ĞÅÏ¢
+		// è·å–ç”¨æˆ·ä¿¡æ¯
 		UserInfo userInfo = userInfoDao.getUserinfo(userId);
 
 		GroupMemberModel member;
 		member.setGroupId(groupId64);
 		member.setUserId(userId);
-		member.setRole(0); // Ä¬ÈÏÆÕÍ¨³ÉÔ±
+		member.setRole(0); // é»˜è®¤æ™®é€šæˆå‘˜
 		member.setJoinTime(Logger::GetInstance().getcurrentTime());
 		member.setQuitTime(0);
 		member.setIsQuit(0);
@@ -323,10 +326,10 @@ Json::Value GroupService::addGroupMember(const Json::Value& memberInfo)
 		resultArray.append(itemResult);
 	}
 
-	// ¶¥²ã code£ºÖ»ÒªÓĞÒ»¸ö³É¹¦¾ÍÖÃÎª 100
+	// é¡¶å±‚ codeï¼šåªè¦æœ‰ä¸€ä¸ªæˆåŠŸå°±ç½®ä¸º 100
 	response["code"] = anySuccess ? 100 : 101;
 	response["groupId"] = Json::UInt64(groupId64);
-	//·µ»Ø³É¹¦Ìí¼Óµ½ÈºÄÚµÄÓÃ»§ÁĞ±í
+	//è¿”å›æˆåŠŸæ·»åŠ åˆ°ç¾¤å†…çš„ç”¨æˆ·åˆ—è¡¨
 	response["results"] = resultArray;
 	return response;
 }
@@ -334,9 +337,9 @@ Json::Value GroupService::addGroupMember(const Json::Value& memberInfo)
 Json::Value GroupService::minuGroupMember(const Json::Value& memberInfo)
 {
 	Json::Value response;
-	response["code"] = 101; // Ä¬ÈÏÊ§°Ü
+	response["code"] = 101; // é»˜è®¤å¤±è´¥
 
-	// 1. »ù±¾²ÎÊıĞ£Ñé£º±ØĞëÓĞ groupId ºÍ users£¨Êı×é£©
+	// 1. åŸºæœ¬å‚æ•°æ ¡éªŒï¼šå¿…é¡»æœ‰ groupId å’Œ usersï¼ˆæ•°ç»„ï¼‰
 	if (!memberInfo["userNames"].isArray())
 	{
 		response["msg"] = "missing groupId or users(array)";
@@ -362,7 +365,7 @@ Json::Value GroupService::minuGroupMember(const Json::Value& memberInfo)
 	GroupMemberDao groupMemberDao;
 	UserInfoDao userInfoDao;
 
-	// 2. ¼ì²éÈºÊÇ·ñ´æÔÚ
+	// 2. æ£€æŸ¥ç¾¤æ˜¯å¦å­˜åœ¨
 	if (!groupChatDao.groupExists(groupId64))
 	{
 		response["code"] = 102;
@@ -370,14 +373,14 @@ Json::Value GroupService::minuGroupMember(const Json::Value& memberInfo)
 		return response;
 	}
 
-	// 2.1 ²éÑ¯ÈºĞÅÏ¢£¬»ñÈ¡´´½¨Õß ID
+	// 2.1 æŸ¥è¯¢ç¾¤ä¿¡æ¯ï¼Œè·å–åˆ›å»ºè€… ID
 	GroupChatModel groupModel = groupChatDao.getGroupById(groupId64);
 	std::string creatorId = groupModel.getCreatorId();
 
-	// ±ê¼ÇÊÇ·ñĞèÒª½âÉ¢Èº£¨ÓĞÈË±»ÒÆ³ıÇÒÊÇÈº´´½¨Õß£©
+	// æ ‡è®°æ˜¯å¦éœ€è¦è§£æ•£ç¾¤ï¼ˆæœ‰äººè¢«ç§»é™¤ä¸”æ˜¯ç¾¤åˆ›å»ºè€…ï¼‰
 	bool needDissolveGroup = false;
 
-	// 3. Öğ¸ö´¦ÀíÓÃ»§
+	// 3. é€ä¸ªå¤„ç†ç”¨æˆ·
 	Json::Value resultArray(Json::arrayValue);
 	bool anySuccess = false;
 
@@ -403,13 +406,13 @@ Json::Value GroupService::minuGroupMember(const Json::Value& memberInfo)
 			continue;
 		}
 
-		// ÏÈ±ê¼ÇÓÃ»§ÍËÈº
+		// å…ˆæ ‡è®°ç”¨æˆ·é€€ç¾¤
 		if (groupMemberDao.markQuit(groupId64, userId, Logger::GetInstance().getcurrentTime()))
 		{
 			anySuccess = true;
 			itemResult["code"] = 100;
 
-			// Èç¹ûÕâ¸ö±»ÒÆ³ıµÄÓÃ»§ÊÇÈº´´½¨Õß£¬ÔòºóÃæ´¥·¢½âÉ¢ÈºÂß¼­
+			// å¦‚æœè¿™ä¸ªè¢«ç§»é™¤çš„ç”¨æˆ·æ˜¯ç¾¤åˆ›å»ºè€…ï¼Œåˆ™åé¢è§¦å‘è§£æ•£ç¾¤é€»è¾‘
 			if (!creatorId.empty() && userId == creatorId)
 			{
 				needDissolveGroup = true;
@@ -423,7 +426,7 @@ Json::Value GroupService::minuGroupMember(const Json::Value& memberInfo)
 		resultArray.append(itemResult);
 	}
 
-	// 4. ÈçÓĞĞèÒª£¬Ö´ĞĞ½âÉ¢ÈºÂß¼­£ºÉ¾³ıÈºÏà¹ØËùÓĞÊı¾İ
+	// 4. å¦‚æœ‰éœ€è¦ï¼Œæ‰§è¡Œè§£æ•£ç¾¤é€»è¾‘ï¼šåˆ é™¤ç¾¤ç›¸å…³æ‰€æœ‰æ•°æ®
 	bool dissolveOk = true;
 	if (needDissolveGroup)
 	{
@@ -440,10 +443,10 @@ Json::Value GroupService::minuGroupMember(const Json::Value& memberInfo)
 		response["groupDissolved"] = dissolveOk ? 1 : 0;
 	}
 
-	// ¶¥²ã code£ºÖ»ÒªÓĞÒ»¸ö³É¹¦¾ÍÖÃÎª 100
+	// é¡¶å±‚ codeï¼šåªè¦æœ‰ä¸€ä¸ªæˆåŠŸå°±ç½®ä¸º 100
 	response["code"] = anySuccess ? 100 : 101;
 	response["groupId"] = Json::UInt64(groupId64);
-	// ·µ»ØÃ¿¸öÓÃ»§µÄ´¦Àí½á¹û
+	// è¿”å›æ¯ä¸ªç”¨æˆ·çš„å¤„ç†ç»“æœ
 	response["results"] = resultArray;
 	return response;
 }
@@ -451,11 +454,11 @@ Json::Value GroupService::minuGroupMember(const Json::Value& memberInfo)
 Json::Value GroupService::updateGroupMemberInfo(const Json::Value& memberInfo)
 {
 	Json::Value response;
-	response["code"] = 101; // Ä¬ÈÏÊ§°Ü
+	response["code"] = 101; // é»˜è®¤å¤±è´¥
 	GroupMemberDao groupMemberDao;
 	uint64_t groupId = memberInfo["groupId"].asUInt64();
 	std::string userId = memberInfo["userName"].asString();
-	//¸üĞÂ³ÉÔ±êÇ³Æ
+	//æ›´æ–°æˆå‘˜æ˜µç§°
 	if (memberInfo.isMember("nickName"))
 	{
 		std::string nickName = memberInfo["nickName"].asString();
@@ -466,7 +469,7 @@ Json::Value GroupService::updateGroupMemberInfo(const Json::Value& memberInfo)
 		}
 
 	}
-	//¸üĞÂ³ÉÔ±½ÇÉ«
+	//æ›´æ–°æˆå‘˜è§’è‰²
 	if (memberInfo.isMember("role"))
 	{
 		int roleId = memberInfo["role"].asInt();
@@ -483,7 +486,7 @@ Json::Value GroupService::updateGroupMemberInfo(const Json::Value& memberInfo)
 Json::Value GroupService::updateGroupInfo(const Json::Value& groupInfo)
 {
 	Json::Value response;
-	response["code"] = 101; // Ä¬ÈÏÊ§°Ü
+	response["code"] = 101; // é»˜è®¤å¤±è´¥
 
 	uint64_t groupId = groupInfo["groupId"].asUInt64();
 	if (groupId == 0)
@@ -494,7 +497,7 @@ Json::Value GroupService::updateGroupInfo(const Json::Value& groupInfo)
 
 	GroupChatDao groupDao;
 
-	// 2. ¼ì²éÈºÊÇ·ñ´æÔÚ
+	// 2. æ£€æŸ¥ç¾¤æ˜¯å¦å­˜åœ¨
 	if (!groupDao.groupExists(groupId))
 	{
 		response["code"] = 102;
@@ -502,13 +505,13 @@ Json::Value GroupService::updateGroupInfo(const Json::Value& groupInfo)
 		return response;
 	}
 
-	// 3. ¹¹Ôì¡°²¿·Ö¸üĞÂ¡±µÄ GroupChatModel
+	// 3. æ„é€ â€œéƒ¨åˆ†æ›´æ–°â€çš„ GroupChatModel
 	GroupChatModel patch;
 
-	// ×Ö¶ÎÔ¼¶¨£º
-	// - ·Ç¿Õ×Ö·û´®²Å¸üĞÂ£ºgroupName / groupAvatar / description
-	// - maxMembers != 0 ²Å¸üĞÂ
-	// - isActive != 255 ²Å¸üĞÂ£¨µ÷ÓÃ·½Èç¹û²»Ïë¸Ä×´Ì¬¾Í²»Òª´«£¬»ò´« 255£©
+	// å­—æ®µçº¦å®šï¼š
+	// - éç©ºå­—ç¬¦ä¸²æ‰æ›´æ–°ï¼šgroupName / groupAvatar / description
+	// - maxMembers != 0 æ‰æ›´æ–°
+	// - isActive != 255 æ‰æ›´æ–°ï¼ˆè°ƒç”¨æ–¹å¦‚æœä¸æƒ³æ”¹çŠ¶æ€å°±ä¸è¦ä¼ ï¼Œæˆ–ä¼  255ï¼‰
 
 	if (groupInfo.isMember("groupName") && groupInfo["groupName"].isString())
 	{
@@ -549,24 +552,24 @@ Json::Value GroupService::updateGroupInfo(const Json::Value& groupInfo)
 	if (groupInfo.isMember("isActive") && groupInfo["isActive"].isInt())
 	{
 		int active = groupInfo["isActive"].asInt();
-		// Ô¼¶¨£º-1 ±íÊ¾¡°²»ĞŞ¸Ä¡±£¬ÆäËü 0/1 ÓĞĞ§
+		// çº¦å®šï¼š-1 è¡¨ç¤ºâ€œä¸ä¿®æ”¹â€ï¼Œå…¶å®ƒ 0/1 æœ‰æ•ˆ
 		if (active == 0 || active == 1)
 		{
 			patch.setIsActive(static_cast<uint8_t>(active));
 		}
 		else
 		{
-			// ²»ĞŞ¸Ä isActive µÄ»°¾ÍÉèÎª 255£¬ÈÃ Dao ²ãÌø¹ı
+			// ä¸ä¿®æ”¹ isActive çš„è¯å°±è®¾ä¸º 255ï¼Œè®© Dao å±‚è·³è¿‡
 			patch.setIsActive(static_cast<uint8_t>(255));
 		}
 	}
 	else
 	{
-		// Î´Ìá¹© isActive£¬ÏÔÊ½±ê¼ÇÎª¡°²»¸üĞÂ¡±
+		// æœªæä¾› isActiveï¼Œæ˜¾å¼æ ‡è®°ä¸ºâ€œä¸æ›´æ–°â€
 		patch.setIsActive(static_cast<uint8_t>(255));
 	}
 
-	// 4. µ÷ÓÃ Dao Ö´ĞĞ¸üĞÂ£¨Ö»¸üĞÂ patch ÖĞ¡°ÓĞÖµ¡±µÄ×Ö¶Î£©
+	// 4. è°ƒç”¨ Dao æ‰§è¡Œæ›´æ–°ï¼ˆåªæ›´æ–° patch ä¸­â€œæœ‰å€¼â€çš„å­—æ®µï¼‰
 	if (groupDao.updateGroupInfo(groupId, patch))
 	{
 		response["code"] = 100;
@@ -597,19 +600,27 @@ std::vector<std::string> GroupService::getUserIds(const int& groupId)
 	return userIds;
 }
 
-std::string GroupService::handleGroupMessage(const Json::Value& jsonMsg)
+Json::Value GroupService::handleGroupMessage(const Json::Value& jsonMsg)
 {
-
 	Json::Value response = jsonMsg;
 	std::string sender = jsonMsg["sendUserId"].asString();
 	std::string content = jsonMsg["msgContent"].asString();
 	int groupId = jsonMsg["receiveId"].asInt();
 	int msgType = jsonMsg["msgType"].asInt();
-	uint64_t msgId = jsonMsg["msgId"].asUInt64();
+	uint64_t clientMsgId = jsonMsg["msgId"].asUInt64();
 	response["code"] = 101;
+	response["clientMsgId"] = Json::UInt64(clientMsgId);
+
+	std::vector<std::string> userIds = getUserIds(groupId);
+	if (sender.empty() || groupId <= 0 ||
+		std::find(userIds.begin(), userIds.end(), sender) == userIds.end())
+	{
+		response["error"] = "sender is not an active group member";
+		return response;
+	}
+
 	GroupMessageDao groupMessageDao;
 	GroupMessageModel msg;
-	msg.setMsgId(msgId);
 	msg.setFileSize(0);
 	msg.setGroupId(static_cast<uint64_t>(groupId));
 	msg.setIsDeleted(0);
@@ -617,43 +628,41 @@ std::string GroupService::handleGroupMessage(const Json::Value& jsonMsg)
 	msg.setMsgContent(content);
 	msg.setMsgType(static_cast<uint8_t>(msgType));
 	msg.setSenderId(sender);
-	msg.setSendTime(Logger::GetInstance().getcurrentTime());
+	const uint64_t serverTime = Logger::GetInstance().getcurrentTime();
+	msg.setSendTime(serverTime);
 	
-	GroupMsgReadDao groupMsgReadDao;
 	std::vector<GroupMsgReadModel> readModels;
-	std::vector<std::string> userIds = getUserIds(groupId);
 	if (userIds.size() > 0)
 	{
 		for (const auto& member : userIds)
 		{
-			// ÅÅ³ı·¢ËÍÕß×Ô¼º
+			// æ’é™¤å‘é€è€…è‡ªå·±
 			if(member==sender)
 				continue;
 			GroupMsgReadModel readModel;
-			readModel.setMsgId(msgId);
+			readModel.setMsgId(0);
 			readModel.setReadTime(0);
 			readModel.setUserId(member);
 			readModels.push_back(readModel);
 		}	
 		
 	}
-	//¸üĞÂÈºµÄ»á»°±í
-	GroupConversationDao groupConvDao;
+	//æ›´æ–°ç¾¤çš„ä¼šè¯è¡¨
 	GroupConversationModel groupConv;
 	groupConv.setGroupId(static_cast<uint64_t>(groupId));
 	groupConv.setLastMsg(content);
 	groupConv.setLastSenderId(sender);
-	groupConv.setUpdateTime(Logger::GetInstance().getcurrentTime());
+	groupConv.setUpdateTime(serverTime);
 	groupConv.setValidList(Logger::GetInstance().joinWithUnderscore(userIds));
+	groupConv.setMsgType(static_cast<uint8_t>(msgType > 0 ? msgType - 1 : 0));
 
-	if (groupMsgReadDao.insertBatch(readModels)>0 && groupMessageDao.insertMessage(msg) > 0 && groupConvDao.insert(groupConv) > 0)
+	if (groupMessageDao.insertMessageBundle(msg, readModels, groupConv))
 	{
 		response["code"] = 100;
-
+		response["msgId"] = Json::UInt64(msg.getMsgId());
+		response["sendTime"] = Json::UInt64(serverTime);
 	}
-	Json::StreamWriterBuilder wbuilder;
-	std::string forwardStr = Json::writeString(wbuilder, response);
-	return forwardStr;
+	return response;
 	
 }
 
@@ -663,7 +672,7 @@ std::string GroupService::groupMessageRead(const Json::Value& jsonMsg)
 	response["code"] = 101;
 	GroupMsgReadDao groupMsgReadDao;
 	GroupMsgReadModel groupMsgReadModel;
-	//ÒÑ¶ÁÏûÏ¢µÄÓÃ»§ID
+	//å·²è¯»æ¶ˆæ¯çš„ç”¨æˆ·ID
 	std::string sender = jsonMsg["sender"].asString();
 	uint64_t msgId = jsonMsg["msgId"].asUInt64();
 	uint64_t readTime = Logger::GetInstance().getcurrentTime();

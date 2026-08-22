@@ -17,6 +17,7 @@ public:
 	std::string messageRead(const Json::Value& jsonMsg);
 	//确认信息为送达
 	std::string messageDelivered(const Json::Value& jsonMsg);
+	std::string messageFailed(const Json::Value& jsonMsg, const std::string& reason);
 	//获取指定用户的所有未读记录
 	Json::Value getunReadMessage(const Json::Value& jsonMsg);
 	//获取指定会话的最近聊天记录

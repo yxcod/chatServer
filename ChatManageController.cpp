@@ -7,6 +7,25 @@ std::unordered_map<std::string, WebSocketConnectionPtr> onlineUsers;
 std::mutex connMutex;
 ChatWSServer* ChatWSServer::instance_ = nullptr;
 
+namespace
+{
+std::string connectedUserName(const WebSocketConnectionPtr& conn)
+{
+    std::lock_guard<std::mutex> lock(connMutex);
+    for (const auto& entry : onlineUsers)
+    {
+        if (entry.second == conn) return entry.first;
+    }
+    return {};
+}
+
+std::string jsonString(const Json::Value& value)
+{
+    Json::StreamWriterBuilder builder;
+    return Json::writeString(builder, value);
+}
+}
+
 ChatWSServer* ChatWSServer::GetInstance()
 {
     return instance_;
@@ -74,19 +93,34 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
     // 心跳处理
     if (msgType == "ping")
     {
+        const std::string authenticatedUser = connectedUserName(conn);
+        if (authenticatedUser.empty() ||
+            authenticatedUser != jsonMsg["userName"].asString()) return;
         UserInfoService userInfoService;
-        userInfoService.handleHeartbeat(jsonMsg["userName"].asString());
+        userInfoService.handleHeartbeat(authenticatedUser);
         return;
     }
     // 正常聊天
     else if (msgType == "chat")
     {
         ChatService chatService;
+        const std::string authenticatedUser = connectedUserName(conn);
+        if (authenticatedUser.empty() ||
+            authenticatedUser != jsonMsg["sendUserId"].asString())
+        {
+            conn->send(chatService.messageFailed(jsonMsg, "invalid sender"));
+            return;
+        }
         Json::Value dbResult = chatService.insertChatRecord(jsonMsg);
         if (dbResult["code"].asInt() != 100)
         {
+            conn->send(chatService.messageFailed(
+                jsonMsg,
+                dbResult.get("error", "message persistence failed").asString()));
             return;
         }
+		jsonMsg["sessionId"] = dbResult["sessionId"];
+		jsonMsg["sendTime"] = dbResult["sendTime"];
 
         std::string receiveId = jsonMsg["receiveId"].asString();
         {
@@ -97,18 +131,14 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
                 it->second->send(chatService.handleMessage(jsonMsg));
             }
 
-            std::string sendUserId = jsonMsg["sendUserId"].asString();
-            auto itSender = onlineUsers.find(sendUserId);
-            if (itSender != onlineUsers.end() && itSender->second && itSender->second->connected())
-            {
-                itSender->second->send(chatService.messageDelivered(jsonMsg));
-            }
         }
+		conn->send(chatService.messageDelivered(jsonMsg));
     }
     // 消息已读回执
     else if (msgType == "chatCallback")
     {
         ChatService chatService;
+		if (connectedUserName(conn) != jsonMsg["sender"].asString()) return;
         std::string receiveId = jsonMsg["receiveId"].asString();
         std::lock_guard<std::mutex> lock(connMutex);
         auto it = onlineUsers.find(receiveId);
@@ -188,9 +218,26 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
     {
 		GroupService groupService;
         std::string sender = jsonMsg["sendUserId"].asString();
+		if (connectedUserName(conn) != sender)
+		{
+			Json::Value failure = jsonMsg;
+			failure["type"] = "groupChatCallback";
+			failure["code"] = 101;
+			failure["clientMsgId"] = jsonMsg["msgId"];
+			failure["error"] = "invalid sender";
+			conn->send(jsonString(failure));
+			return;
+		}
 		int groupId = jsonMsg["receiveId"].asInt();
 		std::vector<std::string> userIds = groupService.getUserIds(groupId);
-		std::string forwardStr = groupService.handleGroupMessage(jsonMsg);
+		Json::Value result = groupService.handleGroupMessage(jsonMsg);
+		if (result["code"].asInt() != 100)
+		{
+			result["type"] = "groupChatCallback";
+			conn->send(jsonString(result));
+			return;
+		}
+		std::string forwardStr = jsonString(result);
         std::lock_guard<std::mutex> lock(connMutex);
         for (const auto& member : userIds)
         {
@@ -207,6 +254,9 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
                 it->second->send(forwardStr);
             }
         }
+		Json::Value acknowledgement = result;
+		acknowledgement["type"] = "groupChatCallback";
+		conn->send(jsonString(acknowledgement));
         return;
 
     }
@@ -214,6 +264,12 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
     else if (msgType == "groupChatCallback")
     {
         GroupService groupService;
+		const std::string reader = jsonMsg["sender"].asString();
+		if (connectedUserName(conn) != reader) return;
+		const int groupId = jsonMsg.get(
+			"groupId", jsonMsg.get("sessionId", jsonMsg.get("receiveId", 0))).asInt();
+		const auto memberIds = groupService.getUserIds(groupId);
+		if (std::find(memberIds.begin(), memberIds.end(), reader) == memberIds.end()) return;
         //反馈给receiveId 他的消息已读
         std::string receiveId = jsonMsg["receiveId"].asString();
 		std::string forward = groupService.groupMessageRead(jsonMsg);

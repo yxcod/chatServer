@@ -3,34 +3,33 @@
 #include"GroupMemberDao.h"
 #include "GroupMessageDao.h"
 #include "GroupMsgReadDao.h"
-#include "userinfoDao.h"
+#include "UserInfoDao.h"
 #include "GroupConversationDao.h"
 class GroupService
 {
 public:
-	//»ñÈ¡ÓÃ»§ËùÓĞÈº×éĞÅÏ¢
+	//è·å–ç”¨æˆ·æ‰€æœ‰ç¾¤ç»„ä¿¡æ¯
 	Json::Value getAllGroups(const Json::Value& groupInfo);
-	//»ñÈ¡ÈºµÄËùÓĞ³ÉÔ±ĞÅÏ¢
+	//è·å–ç¾¤çš„æ‰€æœ‰æˆå‘˜ä¿¡æ¯
 	Json::Value getGroupMembers(const Json::Value& groupInfo);
-	//»ñÈ¡ÈºµÄÁÄÌì¼ÇÂ¼
+	//è·å–ç¾¤çš„èŠå¤©è®°å½•
 	Json::Value getGroupChatRecord(const Json::Value& groupInfo);
-	//»ñÈ¡ÓÃ»§µÄÈº»á»°ÁĞ±í
+	//è·å–ç”¨æˆ·çš„ç¾¤ä¼šè¯åˆ—è¡¨
 	Json::Value getGroupConversations(const Json::Value& userInfo);
-	//´´½¨ÈºÁÄ
+	//åˆ›å»ºç¾¤èŠ
 	Json::Value createGroup(const Json::Value& groupInfo);
-	//ÈºÌí¼ÓÓÃ»§
+	//ç¾¤æ·»åŠ ç”¨æˆ·
 	Json::Value addGroupMember(const Json::Value& memberInfo);
-	//ÒÆ³ıÈËÔ±³öÈº
+	//ç§»é™¤äººå‘˜å‡ºç¾¤
 	Json::Value minuGroupMember(const Json::Value& memberInfo);
-	//¸üĞÂ³ÉÔ±ÈºĞÅÏ¢
+	//æ›´æ–°æˆå‘˜ç¾¤ä¿¡æ¯
 	Json::Value updateGroupMemberInfo(const Json::Value& memberInfo);
-	//¸üĞÂÈºĞÅÏ¢
+	//æ›´æ–°ç¾¤ä¿¡æ¯
 	Json::Value updateGroupInfo(const Json::Value& groupInfo);
-	//»ñÈ¡Èº³ÉÔ±IDÁĞ±í
+	//è·å–ç¾¤æˆå‘˜IDåˆ—è¡¨
 	std::vector<std::string> getUserIds(const int& groupId);
-	//ÏûÏ¢×ª·¢
-	std::string handleGroupMessage(const Json::Value& jsonMsg);
-	//È·ÈÏÈºÏûÏ¢ÎªÒÑ¶Á
+	//æ¶ˆæ¯è½¬å‘
+	Json::Value handleGroupMessage(const Json::Value& jsonMsg);
+	//ç¡®è®¤ç¾¤æ¶ˆæ¯ä¸ºå·²è¯»
 	std::string groupMessageRead(const Json::Value& jsonMsg);
 };
-

@@ -12,38 +12,42 @@ class ChatDao
 public:
 	std::vector<ConversationModel> getUserAllConversation(const std::string& userId) const;
 	
-	//É¾³ı»á»°¼ÇÂ¼£¬·µ»ØÊÜÓ°ÏìĞĞÊı
+	//åˆ é™¤ä¼šè¯è®°å½•ï¼Œè¿”å›å—å½±å“è¡Œæ•°
 	int deleteConversationByConvId(const std::string& convId) const;
 	// insert or update conversation record: returns affected rows (1 on success, 0 on failure)
 	int updateConversation(const ConversationModel &conversation) const;
+	bool getConversationByConvId(const std::string& convId,
+		ConversationModel& conversation) const;
+	bool insertChatRecordAndUpdateConversation(
+		const ChatRecord& record,
+		const ConversationModel& conversation) const;
 
-	// -- Chat record (chatrecord) related operations (ĞÂÔö£¬²»ĞŞ¸ÄÒÑÓĞ´úÂë)
-	// ²éÑ¯½ÓÊÕ·½ receiveId µÄ×î½üÁÄÌì¼ÇÂ¼£¨°´ sendTime ½µĞò£©£¬limit Ä¬ÈÏÎª 100
+	// -- Chat record (chatrecord) related operations (æ–°å¢ï¼Œä¸ä¿®æ”¹å·²æœ‰ä»£ç )
+	// æŸ¥è¯¢æ¥æ”¶æ–¹ receiveId çš„æœ€è¿‘èŠå¤©è®°å½•ï¼ˆæŒ‰ sendTime é™åºï¼‰ï¼Œlimit é»˜è®¤ä¸º 100
 	std::vector<ChatRecord> getChatRecordsByReceiveId(const std::string& receiveId, size_t limit = 100) const;
 
-	//»ñÈ¡ÓÃ»§µÄËùÓĞÎ´¶Á¼ÇÂ¼
+	//è·å–ç”¨æˆ·çš„æ‰€æœ‰æœªè¯»è®°å½•
 	std::vector<ChatRecord> getUnreadMessage(const std::string& userName);
 
-	// ²åÈëÒ»ÌõÁÄÌì¼ÇÂ¼£¬·µ»ØÊÜÓ°ÏìĞĞÊı£¨»ò 0 ±íÊ¾Ê§°Ü£©
+	// æ’å…¥ä¸€æ¡èŠå¤©è®°å½•ï¼Œè¿”å›å—å½±å“è¡Œæ•°ï¼ˆæˆ– 0 è¡¨ç¤ºå¤±è´¥ï¼‰
 	int insertChatRecord(const ChatRecord &record) const;
 
-	// ¸ù¾İÏûÏ¢ id É¾³ıÁÄÌì¼ÇÂ¼£¬·µ»ØÊÜÓ°ÏìĞĞÊı
+	// æ ¹æ®æ¶ˆæ¯ id åˆ é™¤èŠå¤©è®°å½•ï¼Œè¿”å›å—å½±å“è¡Œæ•°
 	int deleteChatRecordById(uint64_t id) const;
 
-	// É¾³ıÖ¸¶¨»á»°£¨sessionId£©ÏÂµÄËùÓĞÁÄÌì¼ÇÂ¼£¬·µ»ØÊÜÓ°ÏìĞĞÊı
+	// åˆ é™¤æŒ‡å®šä¼šè¯ï¼ˆsessionIdï¼‰ä¸‹çš„æ‰€æœ‰èŠå¤©è®°å½•ï¼Œè¿”å›å—å½±å“è¡Œæ•°
 	int deleteChatRecordsBetweenUsers(const std::string& sessionId) const;
 
-	// ¸ù¾İ»á»°ID sessionId ²éÑ¯ chatrecord ±íÖĞµÄËùÓĞÁÄÌì¼ÇÂ¼
+	// æ ¹æ®ä¼šè¯ID sessionId æŸ¥è¯¢ chatrecord è¡¨ä¸­çš„æ‰€æœ‰èŠå¤©è®°å½•
 	std::vector<ChatRecord> getChatRecordsBySessionId(const std::string& sessionId) const;
 
-	// ¸ù¾İÒµÎñÏûÏ¢ID msgId ¸üĞÂ chatrecord ±íÖĞµÄ msgStatus
+	// æ ¹æ®ä¸šåŠ¡æ¶ˆæ¯ID msgId æ›´æ–° chatrecord è¡¨ä¸­çš„ msgStatus
 	int updateMsgStatusByMsgId(uint64_t msgId, uint8_t msgStatus) const;
 
-	// ½«Ö¸¶¨»á»° convId ÖĞ¶ÔÓ¦ÓÃ»§µÄÎ´¶ÁÊıÇåÁã
-	// Èç¹û userName == user1Id£¬Ôò½« user1UnreadCount ÖÃÎª 0
-	// Èç¹û userName == user2Id£¬Ôò½« user2UnreadCount ÖÃÎª 0
+	// å°†æŒ‡å®šä¼šè¯ convId ä¸­å¯¹åº”ç”¨æˆ·çš„æœªè¯»æ•°æ¸…é›¶
+	// å¦‚æœ userName == user1Idï¼Œåˆ™å°† user1UnreadCount ç½®ä¸º 0
+	// å¦‚æœ userName == user2Idï¼Œåˆ™å°† user2UnreadCount ç½®ä¸º 0
 	int resetUnreadCountForUser(const std::string& convId, const std::string& userName) const;
-	// »ñÈ¡Ö¸¶¨»á»° sessionId ÏÂµÄ×î½ü limit ÌõÁÄÌì¼ÇÂ¼£¬°´·¢ËÍÊ±¼ä½µĞòÅÅÁĞ
+	// è·å–æŒ‡å®šä¼šè¯ sessionId ä¸‹çš„æœ€è¿‘ limit æ¡èŠå¤©è®°å½•ï¼ŒæŒ‰å‘é€æ—¶é—´é™åºæ’åˆ—
 	std::vector<ChatRecord> getRecentChatRecordsBySessionId(const std::string& sessionId, int limit) const;
 };
-

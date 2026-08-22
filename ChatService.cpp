@@ -115,60 +115,61 @@ Json::Value ChatService::insertChatRecord(const Json::Value& chatRecord)
         rec.setExtendInfo(chatRecord["extendInfo"].asString());
     }
 
-    ChatDao dao;
-    //图片
-    if (rec.getMsgType() == ChatRecord::MsgType::IMAGE)
+    if (rec.getMsgId() == 0 || rec.getSessionId().empty() ||
+        rec.getSendUserId().empty() || rec.getReceiveId().empty())
     {
-		rec.setMsgContent("[图片]");
-
+        result["error"] = "invalid private message";
+        return result;
     }
-    int affected = dao.insertChatRecord(rec);
-    if (affected > 0) {
-        // 插入聊天记录成功，同时更新会话表 conversations
-        ConversationModel conv;
-        // sessionId 即 convId
+    if (rec.getSendTime() == 0)
+    {
+        rec.setSendTime(Logger::GetInstance().getcurrentTime());
+    }
+	rec.setMsgStatus(static_cast<uint8_t>(ChatRecord::MsgStatus::SUCCESS));
+
+    ChatDao dao;
+    ConversationModel conv;
+    if (!dao.getConversationByConvId(rec.getSessionId(), conv))
+    {
         conv.setConvId(rec.getSessionId());
-        // 单聊会话，convType 默认为 1
         conv.setConvType(1);
-        // 会话双方：user1Id / user2Id
-        conv.setUser1Id(rec.getSendUserId());
-        conv.setUser2Id(rec.getReceiveId());
-        // 单聊 groupId 为空
+        if (rec.getSendUserId() < rec.getReceiveId())
+        {
+            conv.setUser1Id(rec.getSendUserId());
+            conv.setUser2Id(rec.getReceiveId());
+        }
+        else
+        {
+            conv.setUser1Id(rec.getReceiveId());
+            conv.setUser2Id(rec.getSendUserId());
+        }
         conv.setGroupId("");
-        // 更新最后一条消息相关字段
-        conv.setLastMsg(rec.getMsgContent());
-        conv.setLastMsgId(std::to_string(rec.getId()));
-        conv.setLastSenderId(rec.getSendUserId());
+        conv.setUser1UnreadCount(0);
+        conv.setUser2UnreadCount(0);
+    }
 
-        // 从数据库中取出当前会话的未读计数
-        int currentUser1Unread = 0;
-        int currentUser2Unread = 0;
-        auto existingConvs = dao.getUserAllConversation(rec.getSendUserId());
-        for (const auto& c : existingConvs) {
-            if (c.getConvId() == conv.getConvId()) {
-                currentUser1Unread = c.getUser1UnreadCount();
-                currentUser2Unread = c.getUser2UnreadCount();
-                break;
-            }
-        }
-        conv.setUser1UnreadCount(currentUser1Unread);
-        conv.setUser2UnreadCount(currentUser2Unread);
+    conv.setLastMsg(rec.getMsgType() == ChatRecord::MsgType::IMAGE
+        ? "[图片]" : rec.getMsgContent());
+    conv.setLastMsgId(std::to_string(rec.getMsgId()));
+    conv.setLastSenderId(rec.getSendUserId());
+    if (rec.getReceiveId() == conv.getUser1Id())
+        conv.setUser1UnreadCount(conv.getUser1UnreadCount() + 1);
+    else if (rec.getReceiveId() == conv.getUser2Id())
+        conv.setUser2UnreadCount(conv.getUser2UnreadCount() + 1);
+    else
+    {
+        result["error"] = "conversation participants do not match";
+        return result;
+    }
+    conv.setUpdateTime(rec.getSendTime());
+    conv.setUser1isVaild(1);
+    conv.setUser2isValid(1);
 
-        // 未读计数：如果发送者是 user1，则给 user2 未读 +1；否则给 user1 未读 +1
-        if (rec.getSendUserId() == conv.getUser1Id()) {
-            conv.setUser2UnreadCount(conv.getUser2UnreadCount() + 1);
-        }
-        else {
-            conv.setUser1UnreadCount(conv.getUser1UnreadCount() + 1);
-        }
-        // 更新时间使用消息发送时间
-        conv.setUpdateTime(rec.getSendTime());
-        conv.setUser1isVaild(1);
-        conv.setUser2isValid(1);
-
-        dao.updateConversation(conv);
-
+    if (dao.insertChatRecordAndUpdateConversation(rec, conv))
+    {
         result["code"] = 100;
+        result["sessionId"] = rec.getSessionId();
+        result["sendTime"] = Json::UInt64(rec.getSendTime());
     }
 
     return result;
@@ -186,13 +187,18 @@ std::string ChatService::handleMessage(const Json::Value& jsonMsg)
         ? jsonMsg["msgId"].asUInt64()
         : 0;
 
-    // 构造转发的精简消息：只包含内容、发送者、时间和 msgId
     Json::Value forward;
     forward["type"] = "message";
     forward["msgContent"] = content;
     forward["sendUserId"] = senderName;
     forward["sendTime"] = sendTime;
     forward["msgId"] = msgId;
+    forward["receiveId"] = jsonMsg["receiveId"];
+    forward["receiveType"] = jsonMsg["receiveType"];
+    forward["msgType"] = jsonMsg["msgType"];
+    forward["msgStatus"] = 1;
+    forward["sessionId"] = jsonMsg["sessionId"];
+    forward["extendInfo"] = jsonMsg["extendInfo"];
 
     Json::StreamWriterBuilder wbuilder;
     std::string forwardStr = Json::writeString(wbuilder, forward);
@@ -202,7 +208,7 @@ std::string ChatService::handleMessage(const Json::Value& jsonMsg)
 std::string ChatService::messageRead(const Json::Value& jsonMsg)
 {
     //消息id
-    UINT64 typeId = jsonMsg["msgId"].asUInt64();
+    uint64_t typeId = jsonMsg["msgId"].asUInt64();
 	//sender此时进入聊天框则清楚sender的未读消息
 	std::string sendId = jsonMsg["sender"].asString();
 	std::string sessionId = jsonMsg["sessionId"].asString();
@@ -222,17 +228,31 @@ std::string ChatService::messageRead(const Json::Value& jsonMsg)
 
 std::string ChatService::messageDelivered(const Json::Value& jsonMsg)
 {
-    UINT64 typeId = jsonMsg["msgId"].asUInt64();
+    uint64_t typeId = jsonMsg["msgId"].asUInt64();
 	//表示发送成功已经收到但是未读
     ChatDao dao;
     dao.updateMsgStatusByMsgId(typeId, 1);
     Json::Value forward;
     forward["msgId"] = typeId;
     forward["type"] = "delivery_ack";
+    forward["status"] = "sent";
     Json::StreamWriterBuilder wbuilder;
     std::string forwardStr = Json::writeString(wbuilder, forward);
     return forwardStr;
    
+}
+
+std::string ChatService::messageFailed(
+    const Json::Value& jsonMsg,
+    const std::string& reason)
+{
+    Json::Value response;
+    response["type"] = "delivery_ack";
+    response["msgId"] = jsonMsg["msgId"];
+    response["status"] = "failed";
+    response["reason"] = reason;
+    Json::StreamWriterBuilder builder;
+    return Json::writeString(builder, response);
 }
 
 Json::Value ChatService::getunReadMessage(const Json::Value& jsonMsg)
@@ -246,7 +266,7 @@ Json::Value ChatService::getunReadMessage(const Json::Value& jsonMsg)
         Json::Value item;
         item["senderName"] = c.getSendUserId();
         item["receiverName"] = c.getReceiveId();
-        item["timnestamp"] = c.getSendTime();
+        item["timestamp"] = c.getSendTime();
         item["msgId"] = c.getMsgId();
         item["content"] = c.getMsgContent();
         item["messageType"] = (int)c.getMsgType() - 1;

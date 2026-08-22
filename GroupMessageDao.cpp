@@ -1,6 +1,95 @@
 #include "GroupMessageDao.h"
 #include "GroupMsgReadDao.h"
+#include <stdexcept>
 GroupMessageDao::GroupMessageDao() = default;
+
+bool GroupMessageDao::insertMessageBundle(
+    GroupMessageModel& msg,
+    const std::vector<GroupMsgReadModel>& readModels,
+    const GroupConversationModel& conversation)
+{
+    auto con = Logger::GetInstance().createConnection();
+    try
+    {
+        con->setAutoCommit(false);
+
+        std::unique_ptr<sql::PreparedStatement> messageStmt(
+            con->prepareStatement(
+                "INSERT INTO groupMessage "
+                "(groupId, senderId, msgType, msgContent, fileSize, sendTime, isDeleted, isRead) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"));
+        messageStmt->setUInt64(1, msg.getGroupId());
+        messageStmt->setString(2, msg.getSenderId());
+        messageStmt->setUInt(3, msg.getMsgType());
+        messageStmt->setString(4, msg.getMsgContent());
+        messageStmt->setUInt64(5, msg.getFileSize());
+        messageStmt->setUInt64(6, msg.getSendTime());
+        messageStmt->setUInt(7, msg.getIsDeleted());
+        messageStmt->setUInt(8, msg.getIsRead());
+        if (messageStmt->executeUpdate() <= 0)
+        {
+            throw std::runtime_error("failed to insert group message");
+        }
+
+        std::unique_ptr<sql::PreparedStatement> idStmt(
+            con->prepareStatement("SELECT LAST_INSERT_ID() AS id"));
+        std::unique_ptr<sql::ResultSet> idResult(idStmt->executeQuery());
+        if (!idResult->next())
+        {
+            throw std::runtime_error("failed to obtain group message id");
+        }
+        const uint64_t serverMsgId = idResult->getUInt64("id");
+        msg.setMsgId(serverMsgId);
+
+        if (!readModels.empty())
+        {
+            std::unique_ptr<sql::PreparedStatement> readStmt(
+                con->prepareStatement(
+                    "INSERT INTO groupMsgRead (msgId, userId, readTime) VALUES (?, ?, ?)"));
+            for (const auto& readModel : readModels)
+            {
+                readStmt->setUInt64(1, serverMsgId);
+                readStmt->setString(2, readModel.getUserId());
+                readStmt->setUInt64(3, readModel.getReadTime());
+                if (readStmt->executeUpdate() <= 0)
+                {
+                    throw std::runtime_error("failed to insert group read status");
+                }
+            }
+        }
+
+        std::unique_ptr<sql::PreparedStatement> conversationStmt(
+            con->prepareStatement(
+                "INSERT INTO groupConversations "
+                "(groupId, updateTime, lastSenderId, lastMsg, validList, msgType) "
+                "VALUES (?, ?, ?, ?, ?, ?) "
+                "ON DUPLICATE KEY UPDATE updateTime = VALUES(updateTime), "
+                "lastSenderId = VALUES(lastSenderId), lastMsg = VALUES(lastMsg), "
+                "validList = VALUES(validList), msgType = VALUES(msgType)"));
+        conversationStmt->setUInt64(1, conversation.getGroupId());
+        conversationStmt->setUInt64(2, conversation.getUpdateTime());
+        conversationStmt->setString(3, conversation.getLastSenderId());
+        conversationStmt->setString(4, conversation.getLastMsg());
+        conversationStmt->setString(5, conversation.getValidList());
+        conversationStmt->setUInt(6, conversation.getMsgType());
+        conversationStmt->executeUpdate();
+
+        con->commit();
+        con->setAutoCommit(true);
+        return true;
+    }
+    catch (const std::exception& e)
+    {
+        try
+        {
+            con->rollback();
+            con->setAutoCommit(true);
+        }
+        catch (...) {}
+        Logger::GetInstance().error(e.what());
+        return false;
+    }
+}
 
 uint64_t GroupMessageDao::insertMessage(GroupMessageModel &msg)
 {
@@ -20,7 +109,7 @@ uint64_t GroupMessageDao::insertMessage(GroupMessageModel &msg)
         pstmt->setUInt(3, msg.getMsgType());
         pstmt->setString(4, msg.getMsgContent());
         pstmt->setUInt64(5, msg.getFileSize());
-        pstmt->setUInt64(6, msg.getSendTime());     // Ê±¼ä´Á
+        pstmt->setUInt64(6, msg.getSendTime());     // æ—¶é—´æˆ³
         pstmt->setUInt(7, msg.getIsDeleted());
         pstmt->setUInt(8, msg.getIsRead());
 
@@ -51,12 +140,12 @@ std::vector<GroupMessageModel> GroupMessageDao::getRecentMessages(uint64_t group
         auto con = Logger::GetInstance().createConnection();
         std::ostringstream sql;
         sql << "SELECT msgId, groupId, senderId, msgType, msgContent, "
-            << "fileSize,sendTime, "
-            << "isDeleted, isRead "
-            << "FROM groupMessage "
-            << "WHERE groupId = ? "
-            << "ORDER BY sendTime ASC "
-            << "LIMIT " << limit;
+            << "fileSize, sendTime, isDeleted, isRead FROM ("
+            << "SELECT msgId, groupId, senderId, msgType, msgContent, "
+            << "fileSize, sendTime, isDeleted, isRead "
+            << "FROM groupMessage WHERE groupId = ? "
+            << "ORDER BY sendTime DESC, msgId DESC LIMIT " << limit
+            << ") AS recent_messages ORDER BY sendTime ASC, msgId ASC";
 
         std::unique_ptr<sql::PreparedStatement> pstmt(
             con->prepareStatement(sql.str()));
@@ -72,7 +161,7 @@ std::vector<GroupMessageModel> GroupMessageDao::getRecentMessages(uint64_t group
             m.setMsgType(static_cast<uint8_t>(res->getUInt("msgType")));
             m.setMsgContent(res->getString("msgContent"));
             m.setFileSize(res->getUInt64("fileSize"));
-            m.setSendTime(res->getUInt64("sendTime"));  // Ê±¼ä´Á
+            m.setSendTime(res->getUInt64("sendTime"));  // æ—¶é—´æˆ³
             m.setIsDeleted(static_cast<uint8_t>(res->getUInt("isDeleted")));
             m.setIsRead(static_cast<uint8_t>(res->getUInt("isRead")));
             msgs.push_back(std::move(m));
@@ -111,7 +200,7 @@ std::vector<GroupMessageModel> GroupMessageDao::getMessagesByTime(uint64_t group
             GroupMessageModel m;
             m.setMsgId(res->getUInt64("msgId"));
             m.setGroupId(res->getUInt64("groupId"));
-            m.setSenderId(res->getString("senderId"));      // ¸ÄÎª string
+            m.setSenderId(res->getString("senderId"));      // æ”¹ä¸º string
             m.setMsgType(static_cast<uint8_t>(res->getUInt("msgType")));
             m.setMsgContent(res->getString("msgContent"));
             m.setFileSize(res->getUInt64("fileSize"));
@@ -135,7 +224,7 @@ std::vector<GroupMessageModel> GroupMessageDao::getUnreadMessagesByUserInGroup(c
     try
     {
         auto con = Logger::GetInstance().createConnection();
-        // Ò»Ìõ SQL£ºÔÚ groupMsgRead ¹ıÂË userId/readTime=0£¬ÔÙ¹ØÁª groupMessage ¹ıÂË groupId
+        // ä¸€æ¡ SQLï¼šåœ¨ groupMsgRead è¿‡æ»¤ userId/readTime=0ï¼Œå†å…³è” groupMessage è¿‡æ»¤ groupId
         std::unique_ptr<sql::PreparedStatement> pstmt(
             con->prepareStatement(
                 "SELECT gm.msgId, gm.groupId, gm.senderId, gm.msgType, "
@@ -162,7 +251,7 @@ std::vector<GroupMessageModel> GroupMessageDao::getUnreadMessagesByUserInGroup(c
             m.setMsgType(static_cast<uint8_t>(res->getUInt("msgType")));
             m.setMsgContent(res->getString("msgContent"));
             m.setFileSize(res->getUInt64("fileSize"));
-            m.setSendTime(res->getUInt64("sendTime"));   // Ê±¼ä´Á
+            m.setSendTime(res->getUInt64("sendTime"));   // æ—¶é—´æˆ³
             m.setIsDeleted(static_cast<uint8_t>(res->getUInt("isDeleted")));
             m.setIsRead(static_cast<uint8_t>(res->getUInt("isRead")));
             result.push_back(std::move(m));
@@ -176,8 +265,8 @@ std::vector<GroupMessageModel> GroupMessageDao::getUnreadMessagesByUserInGroup(c
     return result;
 }
 
-// ÒÑÓĞµÄ getUnreadCountByUserAndGroup ¿É±£³Ö²»±ä£º
-// Ê¹ÓÃÍ¬ÑùµÄ¹ØÁªÌõ¼ş£¬Ö»ÊÇ SELECT COUNT(*)
+// å·²æœ‰çš„ getUnreadCountByUserAndGroup å¯ä¿æŒä¸å˜ï¼š
+// ä½¿ç”¨åŒæ ·çš„å…³è”æ¡ä»¶ï¼Œåªæ˜¯ SELECT COUNT(*)
 int GroupMessageDao::getUnreadCountByUserAndGroup(const std::string& userId, uint64_t groupId) const
 {
     int count = 0;
@@ -185,7 +274,7 @@ int GroupMessageDao::getUnreadCountByUserAndGroup(const std::string& userId, uin
     {
         auto con = Logger::GetInstance().createConnection();
 
-        // Ò»Ìõ SQL£ºÔÚ groupMsgRead ¹ıÂË userId/readTime=0£¬ÔÙ¹ØÁª groupMessage ¹ıÂË groupId ¼ÆÊı
+        // ä¸€æ¡ SQLï¼šåœ¨ groupMsgRead è¿‡æ»¤ userId/readTime=0ï¼Œå†å…³è” groupMessage è¿‡æ»¤ groupId è®¡æ•°
         std::unique_ptr<sql::PreparedStatement> pstmt(
             con->prepareStatement(
                 "SELECT COUNT(*) AS cnt "
@@ -217,7 +306,7 @@ bool GroupMessageDao::deleteMessagesByGroupId(uint64_t groupId)
     {
         auto con = Logger::GetInstance().createConnection();
 
-        // 1. ²éÑ¯¸ÃÈºËùÓĞ msgId
+        // 1. æŸ¥è¯¢è¯¥ç¾¤æ‰€æœ‰ msgId
         std::unique_ptr<sql::PreparedStatement> selectStmt(
             con->prepareStatement(
                 "SELECT msgId FROM groupMessage WHERE groupId = ?"));
@@ -233,26 +322,26 @@ bool GroupMessageDao::deleteMessagesByGroupId(uint64_t groupId)
             }
         }
 
-        // 2. ÖğÌõÉ¾³ı¶ÔÓ¦µÄÒÑ¶Á¼ÇÂ¼
+        // 2. é€æ¡åˆ é™¤å¯¹åº”çš„å·²è¯»è®°å½•
         GroupMsgReadDao readDao;
         for (uint64_t msgId : msgIds)
         {
-            // °´ÄãÔÚ GroupMsgReadDao::deleteByMsgId ÀïµÄ·ç¸ñ£¬
-            // Ã»ÓĞ¼ÇÂ¼Ê±Ò²ÊÓÎª³É¹¦£¬ÕâÀï²»×öÊ§°ÜÖĞ¶Ï
+            // æŒ‰ä½ åœ¨ GroupMsgReadDao::deleteByMsgId é‡Œçš„é£æ ¼ï¼Œ
+            // æ²¡æœ‰è®°å½•æ—¶ä¹Ÿè§†ä¸ºæˆåŠŸï¼Œè¿™é‡Œä¸åšå¤±è´¥ä¸­æ–­
             readDao.deleteByMsgId(msgId);
         }
 
-        // 3. É¾³ı groupMessage ÖĞ¸ÃÈºµÄËùÓĞÏûÏ¢
+        // 3. åˆ é™¤ groupMessage ä¸­è¯¥ç¾¤çš„æ‰€æœ‰æ¶ˆæ¯
         std::unique_ptr<sql::PreparedStatement> deleteStmt(
             con->prepareStatement(
                 "DELETE FROM groupMessage WHERE groupId = ?"));
 
         deleteStmt->setUInt64(1, groupId);
 
-        // Èç¹ûÄãÏ£Íû¡°Ã»ÓĞÏûÏ¢Ò²Ëã³É¹¦¡±£¬Ö±½ÓÖ´ĞĞ²¢·µ»Ø true
+        // å¦‚æœä½ å¸Œæœ›â€œæ²¡æœ‰æ¶ˆæ¯ä¹Ÿç®—æˆåŠŸâ€ï¼Œç›´æ¥æ‰§è¡Œå¹¶è¿”å› true
         deleteStmt->executeUpdate();
         return true;
-        // Èç¹ûÄãÏëÖÁÉÙÉ¾µ½Ò»ĞĞ²ÅËã³É¹¦£¬¾ÍÓÃ£º
+        // å¦‚æœä½ æƒ³è‡³å°‘åˆ åˆ°ä¸€è¡Œæ‰ç®—æˆåŠŸï¼Œå°±ç”¨ï¼š
         // return deleteStmt->executeUpdate() > 0;
     }
     catch (const std::exception& e)

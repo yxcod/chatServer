@@ -4,28 +4,34 @@
 #include <string>
 #include "Logger.h"
 #include "GroupMessageModel.h"
+#include "GroupMsgReadModel.h"
+#include "GroupConversationModel.h"
 
 class GroupMessageDao
 {
 public:
     GroupMessageDao();
 
-    // ²åÈëÒ»ÌõÈºÏûÏ¢£¬·µ»Ø×ÔÔö msgId£¨Ê§°Ü·µ»Ø 0£©
+    // æ’å…¥ä¸€æ¡ç¾¤æ¶ˆæ¯ï¼Œè¿”å›è‡ªå¢ msgIdï¼ˆå¤±è´¥è¿”å› 0ï¼‰
     uint64_t insertMessage(GroupMessageModel &msg);
 
-    // °´Èº»ñÈ¡×î½ü N ÌõÏûÏ¢£¨°´ sendTime DESC£©
+    bool insertMessageBundle(GroupMessageModel& msg,
+                             const std::vector<GroupMsgReadModel>& readModels,
+                             const GroupConversationModel& conversation);
+
+    // æŒ‰ç¾¤è·å–æœ€è¿‘ N æ¡æ¶ˆæ¯ï¼ˆæŒ‰ sendTime DESCï¼‰
     std::vector<GroupMessageModel> getRecentMessages(uint64_t groupId,
                                                      std::size_t limit) const;
 
-    // °´Ê±¼ä·¶Î§·ÖÒ³»ñÈ¡ÏûÏ¢
+    // æŒ‰æ—¶é—´èŒƒå›´åˆ†é¡µè·å–æ¶ˆæ¯
     std::vector<GroupMessageModel> getMessagesByTime(uint64_t groupId,
                                                     const uint64_t& beginTime,
                                                     const uint64_t& endTime) const;
-    // ĞŞ¸Ä£ºÖ¸¶¨ userId ÔÚÖ¸¶¨ groupId ÏÂµÄÎ´¶ÁÈºÏûÏ¢
+    // ä¿®æ”¹ï¼šæŒ‡å®š userId åœ¨æŒ‡å®š groupId ä¸‹çš„æœªè¯»ç¾¤æ¶ˆæ¯
     std::vector<GroupMessageModel> getUnreadMessagesByUserInGroup(const std::string& userId,uint64_t groupId) const;
-   // Ö¸¶¨ÓÃ»§ÔÚÖ¸¶¨ÈºÀïµÄÎ´¶ÁÏûÏ¢ÌõÊı
+   // æŒ‡å®šç”¨æˆ·åœ¨æŒ‡å®šç¾¤é‡Œçš„æœªè¯»æ¶ˆæ¯æ¡æ•°
     int getUnreadCountByUserAndGroup(const std::string &userId, uint64_t groupId) const;
-    // ¸ù¾İ groupId É¾³ı¸ÃÈºËùÓĞÏûÏ¢¼°Æä¶ÔÓ¦µÄÒÑ¶Á¼ÇÂ¼
+    // æ ¹æ® groupId åˆ é™¤è¯¥ç¾¤æ‰€æœ‰æ¶ˆæ¯åŠå…¶å¯¹åº”çš„å·²è¯»è®°å½•
     bool deleteMessagesByGroupId(uint64_t groupId);
 private:
 };

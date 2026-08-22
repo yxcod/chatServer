@@ -1,5 +1,6 @@
 #include "ChatDao.h"
 #include "Logger.h"
+#include <stdexcept>
 
 std::vector<ConversationModel> ChatDao::getUserAllConversation(const std::string& userId) const
 {
@@ -103,6 +104,110 @@ int ChatDao::updateConversation(const ConversationModel& conversation) const
     catch (...)
     {
         return 0;
+    }
+}
+
+bool ChatDao::getConversationByConvId(
+    const std::string& convId,
+    ConversationModel& conversation) const
+{
+    auto con = Logger::GetInstance().createConnection();
+    try
+    {
+        std::unique_ptr<sql::PreparedStatement> pstmt(con->prepareStatement(
+            "SELECT * FROM conversations WHERE convId = ? LIMIT 1"));
+        pstmt->setString(1, convId);
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+        if (!res->next()) return false;
+
+        conversation.setConvId(res->getString("convId"));
+        conversation.setConvType(static_cast<uint8_t>(res->getUInt("convType")));
+        conversation.setUser1Id(res->getString("user1Id"));
+        conversation.setUser2Id(res->getString("user2Id"));
+        conversation.setGroupId(res->getString("groupId"));
+        conversation.setLastMsg(res->getString("lastMsg"));
+        conversation.setLastMsgId(res->getString("lastMsgId"));
+        conversation.setLastSenderId(res->getString("lastSenderId"));
+        conversation.setUser1UnreadCount(res->getInt("user1UnreadCount"));
+        conversation.setUser2UnreadCount(res->getInt("user2UnreadCount"));
+        conversation.setUpdateTime(res->getUInt64("updateTime"));
+        conversation.setUser2isValid(static_cast<uint8_t>(res->getUInt("user2isValid")));
+        conversation.setUser1isVaild(static_cast<uint8_t>(res->getUInt("user1isVaild")));
+        return true;
+    }
+    catch (...) { return false; }
+}
+
+bool ChatDao::insertChatRecordAndUpdateConversation(
+    const ChatRecord& record,
+    const ConversationModel& conversation) const
+{
+    auto con = Logger::GetInstance().createConnection();
+    try
+    {
+        con->setAutoCommit(false);
+
+        std::unique_ptr<sql::PreparedStatement> recordStmt(con->prepareStatement(
+            "INSERT INTO chatrecord (id, msgId, sendUserId, receiveType, receiveId, msgType, "
+            "msgContent, msgStatus, sendTime, readTime, extendInfo, sessionId) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
+        recordStmt->setUInt64(1, record.getId());
+        recordStmt->setUInt64(2, record.getMsgId());
+        recordStmt->setString(3, record.getSendUserId());
+        recordStmt->setUInt(4, record.getReceiveTypeAsUInt8());
+        recordStmt->setString(5, record.getReceiveId());
+        recordStmt->setUInt(6, record.getMsgTypeAsUInt8());
+        recordStmt->setString(7, record.getMsgContent());
+        recordStmt->setUInt(8, record.getMsgStatusAsUInt8());
+        recordStmt->setUInt64(9, record.getSendTime());
+        recordStmt->setUInt64(10, record.getReadTime());
+        recordStmt->setString(11, record.getExtendInfo());
+        recordStmt->setString(12, record.getSessionId());
+        if (recordStmt->executeUpdate() <= 0)
+        {
+            throw std::runtime_error("failed to insert private chat record");
+        }
+
+        std::unique_ptr<sql::PreparedStatement> conversationStmt(con->prepareStatement(
+            "INSERT INTO conversations (convId, convType, user1Id, user2Id, groupId, lastMsg, "
+            "lastMsgId, lastSenderId, user1UnreadCount, user2UnreadCount, updateTime, "
+            "user2isValid, user1isVaild) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON DUPLICATE KEY UPDATE convType = VALUES(convType), user1Id = VALUES(user1Id), "
+            "user2Id = VALUES(user2Id), groupId = VALUES(groupId), lastMsg = VALUES(lastMsg), "
+            "lastMsgId = VALUES(lastMsgId), lastSenderId = VALUES(lastSenderId), "
+            "user1UnreadCount = user1UnreadCount + IF(VALUES(lastSenderId) = user2Id, 1, 0), "
+            "user2UnreadCount = user2UnreadCount + IF(VALUES(lastSenderId) = user1Id, 1, 0), "
+            "updateTime = VALUES(updateTime), user2isValid = VALUES(user2isValid), "
+            "user1isVaild = VALUES(user1isVaild)"));
+        conversationStmt->setString(1, conversation.getConvId());
+        conversationStmt->setUInt(2, conversation.getConvType());
+        conversationStmt->setString(3, conversation.getUser1Id());
+        conversationStmt->setString(4, conversation.getUser2Id());
+        conversationStmt->setString(5, conversation.getGroupId());
+        conversationStmt->setString(6, conversation.getLastMsg());
+        conversationStmt->setString(7, conversation.getLastMsgId());
+        conversationStmt->setString(8, conversation.getLastSenderId());
+        conversationStmt->setInt(9, conversation.getUser1UnreadCount());
+        conversationStmt->setInt(10, conversation.getUser2UnreadCount());
+        conversationStmt->setUInt64(11, conversation.getUpdateTime());
+        conversationStmt->setUInt(12, conversation.getUser2isValid());
+        conversationStmt->setUInt(13, conversation.getUser1isVaild());
+        conversationStmt->executeUpdate();
+
+        con->commit();
+        con->setAutoCommit(true);
+        return true;
+    }
+    catch (const std::exception& e)
+    {
+        try
+        {
+            con->rollback();
+            con->setAutoCommit(true);
+        }
+        catch (...) {}
+        Logger::GetInstance().error(e.what());
+        return false;
     }
 }
 
@@ -393,10 +498,10 @@ int ChatDao::updateMsgStatusByMsgId(uint64_t msgId, uint8_t msgStatus) const
 
 int ChatDao::resetUnreadCountForUser(const std::string& convId, const std::string& userName) const
 {
-    // ¸ù¾İ´«ÈëµÄ userName ÊÇ·ñÆ¥Åä user1Id / user2Id À´¾ö¶¨ÇåÁãÄÄ¸öÎ´¶Á¼ÆÊı
-    // ÕâÀïÔÚÒ»Ìõ SQL ÖĞ´¦ÀíÁ½ÖÖÇé¿ö£º
-    // Èç¹û userName == user1Id£¬Ôò½« user1UnreadCount ÉèÎª 0
-    // Èç¹û userName == user2Id£¬Ôò½« user2UnreadCount ÉèÎª 0
+    // æ ¹æ®ä¼ å…¥çš„ userName æ˜¯å¦åŒ¹é… user1Id / user2Id æ¥å†³å®šæ¸…é›¶å“ªä¸ªæœªè¯»è®¡æ•°
+    // è¿™é‡Œåœ¨ä¸€æ¡ SQL ä¸­å¤„ç†ä¸¤ç§æƒ…å†µï¼š
+    // å¦‚æœ userName == user1Idï¼Œåˆ™å°† user1UnreadCount è®¾ä¸º 0
+    // å¦‚æœ userName == user2Idï¼Œåˆ™å°† user2UnreadCount è®¾ä¸º 0
     std::string sql =
         "UPDATE conversations "
         "SET user1UnreadCount = CASE WHEN user1Id = ? THEN 0 ELSE user1UnreadCount END, "
@@ -408,8 +513,8 @@ int ChatDao::resetUnreadCountForUser(const std::string& convId, const std::strin
         std::unique_ptr<sql::PreparedStatement> pstmt(
             con->prepareStatement(sql));
         pstmt->setString(1, sql);
-        pstmt->setString(1, userName); // ¶ÔÓ¦ user1Id
-        pstmt->setString(2, userName); // ¶ÔÓ¦ user2Id
+        pstmt->setString(1, userName); // å¯¹åº” user1Id
+        pstmt->setString(2, userName); // å¯¹åº” user2Id
         pstmt->setString(3, convId);
         int affected = pstmt->executeUpdate();
         return affected;
@@ -427,10 +532,10 @@ std::vector<ChatRecord> ChatDao::getRecentChatRecordsBySessionId(const std::stri
         return records;
     }
 
-    // Ã¿´Îµ÷ÓÃ¶¼´´½¨Ò»¸ö¶ÀÁ¢Á¬½Ó
+    // æ¯æ¬¡è°ƒç”¨éƒ½åˆ›å»ºä¸€ä¸ªç‹¬ç«‹è¿æ¥
     auto con = Logger::GetInstance().createConnection();
 
-    // ÏÈ²éÑ¯¸Ã sessionId µÄ×ÜÌõÊı
+    // å…ˆæŸ¥è¯¢è¯¥ sessionId çš„æ€»æ¡æ•°
     int totalCount = 0;
     try
     {
@@ -448,25 +553,25 @@ std::vector<ChatRecord> ChatDao::getRecentChatRecordsBySessionId(const std::stri
     }
     catch (...)
     {
-        // Èç¹ûÍ³¼ÆÊ§°Ü£¬ÔòÍË»¯ÎªÖ±½Ó°´´«ÈëµÄ limit ²éÑ¯
+        // å¦‚æœç»Ÿè®¡å¤±è´¥ï¼Œåˆ™é€€åŒ–ä¸ºç›´æ¥æŒ‰ä¼ å…¥çš„ limit æŸ¥è¯¢
         totalCount = 0;
     }
 
-    // Êµ¼ÊÒªÈ¡µÄÌõÊı = min(limit, totalCount)£¬
-    // Èç¹û totalCount == 0£¬ËµÃ÷Õâ¸ö»á»°±¾À´¾ÍÃ»ÓĞ¼ÇÂ¼
+    // å®é™…è¦å–çš„æ¡æ•° = min(limit, totalCount)ï¼Œ
+    // å¦‚æœ totalCount == 0ï¼Œè¯´æ˜è¿™ä¸ªä¼šè¯æœ¬æ¥å°±æ²¡æœ‰è®°å½•
     int realLimit = limit;
     if (totalCount > 0 && limit > totalCount)
     {
         realLimit = totalCount;
     }
 
-    // Èç¹ûÃ»ÓĞ¼ÇÂ¼£¬Ö±½Ó·µ»Ø¿Õ vector
+    // å¦‚æœæ²¡æœ‰è®°å½•ï¼Œç›´æ¥è¿”å›ç©º vector
     if (realLimit <= 0)
     {
         return records;
     }
 
-    // °´ sendTime ½µĞòÈ¡×î½ü realLimit Ìõ
+    // æŒ‰ sendTime é™åºå–æœ€è¿‘ realLimit æ¡
     std::string sql =
         "SELECT id, msgId, sendUserId, receiveType, receiveId, msgType, msgContent, "
         "       msgStatus, sendTime, readTime, extendInfo, sessionId "
@@ -524,7 +629,7 @@ std::vector<ChatRecord> ChatDao::getRecentChatRecordsBySessionId(const std::stri
         return records;
     }
 
-    // ÕâÀïº¯Êı½áÊøÊ±£º
-    // res/pstmt/countRes/countStmt ÏÈÎö¹¹£¬ÔÙÎö¹¹ con£¬Á¬½Ó×Ô¶¯¹Ø±Õ
+    // è¿™é‡Œå‡½æ•°ç»“æŸæ—¶ï¼š
+    // res/pstmt/countRes/countStmt å…ˆææ„ï¼Œå†ææ„ conï¼Œè¿æ¥è‡ªåŠ¨å…³é—­
     return records;
 }

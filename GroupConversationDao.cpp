@@ -2,9 +2,9 @@
 
 GroupConversationDao::GroupConversationDao() = default;
 
-// ĞèÒªÔÚ±íÉÏĞÂÔöÁĞ²¢½¨Î¨Ò»Ë÷Òı£º
+// éœ€è¦åœ¨è¡¨ä¸Šæ–°å¢åˆ—å¹¶å»ºå”¯ä¸€ç´¢å¼•ï¼š
 // ALTER TABLE groupConversations
-//   ADD COLUMN msgType TINYINT UNSIGNED DEFAULT 0 COMMENT 'ÏûÏ¢ÀàĞÍ£º0-ÎÄ±¾ 1-Í¼Æ¬ 2-ÎÄ¼ş 3-ÓïÒô',
+//   ADD COLUMN msgType TINYINT UNSIGNED DEFAULT 0 COMMENT 'æ¶ˆæ¯ç±»å‹ï¼š0-æ–‡æœ¬ 1-å›¾ç‰‡ 2-æ–‡ä»¶ 3-è¯­éŸ³',
 //   ADD UNIQUE KEY uk_groupId (groupId);
 int GroupConversationDao::insert(const GroupConversationModel& conv)
 {
@@ -12,7 +12,7 @@ int GroupConversationDao::insert(const GroupConversationModel& conv)
     try
     {
         auto con = Logger::GetInstance().createConnection();
-        // Ò»Ìõ SQL£ºgroupId ²»´æÔÚÔò²åÈë£¬´æÔÚÔòÖ»¸üĞÂ×î½üÏûÏ¢Ïà¹Ø×Ö¶Î
+        // ä¸€æ¡ SQLï¼šgroupId ä¸å­˜åœ¨åˆ™æ’å…¥ï¼Œå­˜åœ¨åˆ™åªæ›´æ–°æœ€è¿‘æ¶ˆæ¯ç›¸å…³å­—æ®µ
         std::unique_ptr<sql::PreparedStatement> pstmt(
             con->prepareStatement(
                 "INSERT INTO groupConversations "
@@ -86,7 +86,7 @@ bool GroupConversationDao::upsert(const GroupConversationModel& conv)
     try
     {
         auto con = Logger::GetInstance().createConnection();
-        // ÏÈ UPDATE£¬²»ĞĞÔÙ INSERT£¨¼æÈİ¾É´úÂë£©
+        // å…ˆ UPDATEï¼Œä¸è¡Œå† INSERTï¼ˆå…¼å®¹æ—§ä»£ç ï¼‰
         std::unique_ptr<sql::PreparedStatement> updateStmt(
             con->prepareStatement(
                 "UPDATE groupConversations "
@@ -157,12 +157,13 @@ std::vector<GroupConversationModel> GroupConversationDao::getConversationsByUser
         auto con = Logger::GetInstance().createConnection();
         std::unique_ptr<sql::PreparedStatement> pstmt(
             con->prepareStatement(
-                "SELECT ID, groupId, updateTime, lastSenderId, lastMsg, validList, msgType "
-                "FROM groupConversations "
-                "WHERE validList LIKE ?"));
+                "SELECT DISTINCT gc.ID, gc.groupId, gc.updateTime, gc.lastSenderId, "
+                "gc.lastMsg, gc.validList, gc.msgType "
+                "FROM groupConversations gc "
+                "JOIN groupMember gm ON gm.groupId = gc.groupId "
+                "WHERE gm.userId = ? AND gm.isQuit = 0"));
 
-        std::string pattern = "%" + userId + "%";
-        pstmt->setString(1, pattern);
+		pstmt->setString(1, userId);
 
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
         while (res->next())
@@ -195,7 +196,7 @@ bool GroupConversationDao::deleteByGroupId(uint64_t groupId)
 
         pstmt->setUInt64(1, groupId);
 
-        // ÊÜÓ°ÏìĞĞÊı > 0 ±íÊ¾É¾³ı³É¹¦
+        // å—å½±å“è¡Œæ•° > 0 è¡¨ç¤ºåˆ é™¤æˆåŠŸ
         return pstmt->executeUpdate() > 0;
     }
     catch (const std::exception& e)
