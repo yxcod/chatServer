@@ -93,10 +93,17 @@ Json::Value GroupService::getGroupChatRecord(const Json::Value& groupInfo)
 	// 2. 查询该群所有消息
 	GroupMessageDao msgDao;
 	// 获取最近 limit 条记录
-	int requestedLimit = groupInfo.get("limit", 100).asInt();
-	std::size_t limit = static_cast<std::size_t>(
-		std::max(1, std::min(requestedLimit, 200)));
-	auto messages = msgDao.getRecentMessages(groupId64, limit);
+	int messageLimit = groupInfo.get("limit", 100).asInt();
+	if (messageLimit < 1)
+	{
+		messageLimit = 1;
+	}
+	else if (messageLimit > 200)
+	{
+		messageLimit = 200;
+	}
+	auto messages = msgDao.getRecentMessages(
+		groupId64, static_cast<std::size_t>(messageLimit));
 
 	// 3. 为每条消息查已读信息
 	GroupMsgReadDao readDao;

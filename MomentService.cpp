@@ -193,7 +193,9 @@ Json::Value MomentService::ownList(const std::string& userName,
     {
         const auto beforeMomentId = readUInt64(request["beforeMomentId"]);
         const auto requestedLimit = request.get("limit", 30).asUInt();
-        const auto limit = std::max(1U, std::min(requestedLimit, 50U));
+        const auto limit = requestedLimit < 1U
+            ? 1U
+            : (requestedLimit > 50U ? 50U : requestedLimit);
         const auto moments = MomentDao().getOwnMoments(
             userName, beforeMomentId, limit);
         Json::Value items(Json::arrayValue);
@@ -227,7 +229,9 @@ Json::Value MomentService::userList(const std::string& userName,
     {
         const auto beforeMomentId = readUInt64(request["beforeMomentId"]);
         const auto requestedLimit = request.get("limit", 30).asUInt();
-        const auto limit = std::max(1U, std::min(requestedLimit, 50U));
+        const auto limit = requestedLimit < 1U
+            ? 1U
+            : (requestedLimit > 50U ? 50U : requestedLimit);
         const auto moments = MomentDao().getVisibleMoments(
             userName, authorUserName, beforeMomentId, limit);
         Json::Value items(Json::arrayValue);
