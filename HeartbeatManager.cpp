@@ -20,33 +20,35 @@ void HeartbeatManager::handleHeartbeat(const std::string& userName)
     }
 
     const uint64_t now = Logger::GetInstance().getcurrentTime();
-    bool needUpdateDb = false;
-
+    // åœ¨çº¿å’Œç¦»çº¿æ•°æ®åº“å†™å…¥å…±ç”¨åŒä¸€æŠŠé”ï¼Œä¿è¯å¿«é€Ÿæ–­çº¿é‡è¿æ—¶å†™å…¥é¡ºåºæ­£ç¡®ã€‚
+    std::lock_guard<std::mutex> lock(m_hbMutex);
+    m_lastHeartbeat[userName] = now;
+    if (m_lastDbOnline.find(userName) == m_lastDbOnline.end())
     {
-        std::lock_guard<std::mutex> lock(m_hbMutex);
-
-        // ¸üĞÂ×î½üÒ»´ÎĞÄÌøÊ±¼ä£¨×ÜÊÇ¸üĞÂ£¬½öÔÚÄÚ´æ£©
-        m_lastHeartbeat[userName] = now;
-
-        // Èç¹ûÖ®Ç°´ÓÎ´°Ñ¸ÃÓÃ»§Ğ´ÎªÔÚÏß£¬Ôò±¾´ÎĞèÒªĞ´Êı¾İ¿â
-        auto it = m_lastDbOnline.find(userName);
-        if (it == m_lastDbOnline.end())
-        {
-            needUpdateDb = true;
-            m_lastDbOnline[userName] = now;
-        }
-    }
-
-    // Ö»ÓĞÔÚĞèÒªÊ±²Å¸üĞÂÊı¾İ¿â£¬±ÜÃâÃ¿´ÎĞÄÌø¶¼Ğ´
-    if (needUpdateDb)
-    {
+        m_lastDbOnline[userName] = now;
         UserInfoDao userInfoDao;
         UserInfo userInfo;
-        userInfo.setState(1); // ÔÚÏß
+        userInfo.setState(1); // åœ¨çº¿
         userInfo.setModifyTime(now);
         userInfoDao.updateUserInfo(userName, userInfo);
     }
 }
+
+void HeartbeatManager::handleDisconnect(const std::string& userName)
+{
+    if (userName.empty()) return;
+
+    // æ•°æ®åº“æ›´æ–°æ”¾åœ¨åŒä¸€æŠŠé”å†…ï¼Œé¿å…æ—§è¿æ¥çš„ç¦»çº¿æ›´æ–°è¦†ç›–åˆšé‡è¿çš„åœ¨çº¿æ›´æ–°ã€‚
+    std::lock_guard<std::mutex> lock(m_hbMutex);
+    m_lastHeartbeat.erase(userName);
+    m_lastDbOnline.erase(userName);
+
+    UserInfo offlineUser;
+    offlineUser.setState(0);
+    offlineUser.setModifyTime(Logger::GetInstance().getcurrentTime());
+    UserInfoDao().updateUserInfo(userName, offlineUser);
+}
+
 void HeartbeatManager::checkHeartbeatTimeout()
 {
     const uint64_t now = Logger::GetInstance().getcurrentTime();
@@ -70,11 +72,11 @@ void HeartbeatManager::checkHeartbeatTimeout()
                 {
                     timeoutUsers.push_back(userName);
 
-                    // ´ÓĞÄÌø±íÖĞÉ¾³ı
+                    // ä»å¿ƒè·³è¡¨ä¸­åˆ é™¤
                     it = m_lastHeartbeat.erase(it);
 
-                    // ¹Ø¼ü£ºÍ¬Ê±´Ó¡°ÒÑĞ´ÔÚÏß¡±±íÖĞÉ¾³ı£¬
-                    // ÕâÑùÏÂ´ÎÕâ¸öÓÃ»§ÓĞĞÄÌøÊ±£¬»áÔÙ´Î needUpdateDb=true£¬ÖØĞÂĞ´ state=1
+                    // å…³é”®ï¼šåŒæ—¶ä»â€œå·²å†™åœ¨çº¿â€è¡¨ä¸­åˆ é™¤ï¼Œ
+                    // è¿™æ ·ä¸‹æ¬¡è¿™ä¸ªç”¨æˆ·æœ‰å¿ƒè·³æ—¶ï¼Œä¼šå†æ¬¡ needUpdateDb=trueï¼Œé‡æ–°å†™ state=1
                     m_lastDbOnline.erase(userName);
                 }
                 else

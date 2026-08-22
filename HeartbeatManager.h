@@ -6,13 +6,16 @@
 class HeartbeatManager
 {
 public:
-    // µ¥Àı»ñÈ¡
+    // å•ä¾‹è·å–
     static HeartbeatManager& GetInstance();
 
-    // Ç°¶ËÃ¿¸ô¼¸Ãëµ÷ÓÃÒ»´Î£¬´«Èë userName£¬¼ÇÂ¼ĞÄÌø²¢±ê¼ÇÔÚÏß
+    // å‰ç«¯æ¯éš”å‡ ç§’è°ƒç”¨ä¸€æ¬¡ï¼Œä¼ å…¥ userNameï¼Œè®°å½•å¿ƒè·³å¹¶æ ‡è®°åœ¨çº¿
     void handleHeartbeat(const std::string& userName);
 
-    // ÓÉ·şÎñÆ÷¶¨Ê±Æ÷ÖÜÆÚĞÔµ÷ÓÃ£¬¼ì²éĞÄÌø³¬Ê±²¢¸üĞÂÀëÏß
+    // WebSocket æ–­å¼€æ—¶ç«‹å³æ¸…ç†çŠ¶æ€ï¼Œä¿è¯åç»­é‡è¿å¯ä»¥é‡æ–°å†™å…¥åœ¨çº¿çŠ¶æ€ã€‚
+    void handleDisconnect(const std::string& userName);
+
+    // ç”±æœåŠ¡å™¨å®šæ—¶å™¨å‘¨æœŸæ€§è°ƒç”¨ï¼Œæ£€æŸ¥å¿ƒè·³è¶…æ—¶å¹¶æ›´æ–°ç¦»çº¿
     void checkHeartbeatTimeout();
 
 private:
@@ -26,8 +29,8 @@ private:
 
 private:
     std::unordered_map<std::string, uint64_t> m_lastHeartbeat;
-    // ×î½üÒ»´ÎÒÑĞ´ÈëÊı¾İ¿âÎªÔÚÏß(state=1)µÄÊ±¼ä
+    // æœ€è¿‘ä¸€æ¬¡å·²å†™å…¥æ•°æ®åº“ä¸ºåœ¨çº¿(state=1)çš„æ—¶é—´
     std::unordered_map<std::string, uint64_t> m_lastDbOnline;
     std::mutex m_hbMutex;
-    static constexpr uint64_t m_timeoutSeconds = 30; // ³¬¹ı20ÃëÊÓÎªÀëÏß
+    static constexpr uint64_t m_timeoutSeconds = 30; // è¶…è¿‡20ç§’è§†ä¸ºç¦»çº¿
 };

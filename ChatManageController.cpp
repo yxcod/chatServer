@@ -1,6 +1,8 @@
 #include "ChatManageController.h"
+#include "FriendRelationDao.h"
+#include "HeartbeatManager.h"
 
-// ÕæÕıµÄ¶¨Òå£¨Ö»³öÏÖÒ»´Î£©
+// çœŸæ­£çš„å®šä¹‰ï¼ˆåªå‡ºç°ä¸€æ¬¡ï¼‰
 std::unordered_map<std::string, WebSocketConnectionPtr> onlineUsers;
 std::mutex connMutex;
 ChatWSServer* ChatWSServer::instance_ = nullptr;
@@ -12,13 +14,19 @@ ChatWSServer* ChatWSServer::GetInstance()
 
 void ChatWSServer::closeConnectionByUser(const std::string& userName)
 {
-    std::lock_guard<std::mutex> lock(connMutex);
-    auto it = onlineUsers.find(userName);
-    if (it != onlineUsers.end() && it->second && it->second->connected())
+    WebSocketConnectionPtr connection;
     {
-        it->second->shutdown();
-        onlineUsers.erase(it);
+        std::lock_guard<std::mutex> lock(connMutex);
+        auto it = onlineUsers.find(userName);
+        if (it != onlineUsers.end())
+        {
+            connection = it->second;
+            onlineUsers.erase(it);
+        }
     }
+    if (!connection) return;
+    if (connection->connected()) connection->shutdown();
+    broadcastPresence(userName, false);
 }
 
 void ChatWSServer::handleNewConnection(const HttpRequestPtr& req,
@@ -31,11 +39,16 @@ void ChatWSServer::handleNewConnection(const HttpRequestPtr& req,
         return;
     }
 
-    // ¼ÇÂ¼µ±Ç°ÊµÀıÖ¸Õë
+    // è®°å½•å½“å‰å®ä¾‹æŒ‡é’ˆ
     instance_ = this;
 
-    std::lock_guard<std::mutex> lock(connMutex);
-    onlineUsers[userName] = conn;
+    {
+        std::lock_guard<std::mutex> lock(connMutex);
+        onlineUsers[userName] = conn;
+    }
+
+    UserInfoService().handleHeartbeat(userName);
+    broadcastPresence(userName, true);
 }
 
 void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
@@ -58,14 +71,14 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
 
     const std::string msgType = jsonMsg["type"].asString();
 
-    // ĞÄÌø´¦Àí
+    // å¿ƒè·³å¤„ç†
     if (msgType == "ping")
     {
         UserInfoService userInfoService;
         userInfoService.handleHeartbeat(jsonMsg["userName"].asString());
         return;
     }
-    // Õı³£ÁÄÌì
+    // æ­£å¸¸èŠå¤©
     else if (msgType == "chat")
     {
         ChatService chatService;
@@ -92,7 +105,7 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
             }
         }
     }
-    // ÏûÏ¢ÒÑ¶Á»ØÖ´
+    // æ¶ˆæ¯å·²è¯»å›æ‰§
     else if (msgType == "chatCallback")
     {
         ChatService chatService;
@@ -100,17 +113,17 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
         std::lock_guard<std::mutex> lock(connMutex);
         auto it = onlineUsers.find(receiveId);
         std::string forward = chatService.messageRead(jsonMsg);
-		//Èô¶Ô·½ÔÚÏßÔò×ª·¢ÒÑ¶Á»ØÖ´ ²»ÔÚÏßÔòÖ»´¦ÀíÊı¾İ¿âÖĞÒÑ¶Á±ê¼Ç
+		//è‹¥å¯¹æ–¹åœ¨çº¿åˆ™è½¬å‘å·²è¯»å›æ‰§ ä¸åœ¨çº¿åˆ™åªå¤„ç†æ•°æ®åº“ä¸­å·²è¯»æ ‡è®°
         if (it != onlineUsers.end() && it->second && it->second->connected())
         {
             it->second->send(forward);
         }
     }
-	// ÊÓÆµÍ¨»°ÑûÇë
+	// è§†é¢‘é€šè¯é‚€è¯·
     else if (msgType == "videoCallInvite")
     {
         ChatService chatService;
-		//±»ÑûÇë·½
+		//è¢«é‚€è¯·æ–¹
         std::string receiveId = jsonMsg["receiver"].asString();
         std::lock_guard<std::mutex> lock(connMutex);
         auto it = onlineUsers.find(receiveId);
@@ -124,11 +137,11 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
 
 
     }
-    // ÊÓÆµÍ¨»°Í¬Òâ
+    // è§†é¢‘é€šè¯åŒæ„
     else if (msgType == "videoCallAccept")
     {
         ChatService chatService;
-		//Ö÷¶¯·¢ÆğÊÓÆµÍ¨»°·½
+		//ä¸»åŠ¨å‘èµ·è§†é¢‘é€šè¯æ–¹
         std::string receiveId = jsonMsg["receiver"].asString();
         std::lock_guard<std::mutex> lock(connMutex);
         auto it = onlineUsers.find(receiveId);
@@ -140,11 +153,11 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
 
 
     }
-    // ÊÓÆµÍ¨»°¾Ü¾ø
+    // è§†é¢‘é€šè¯æ‹’ç»
     else if (msgType == "videoCallReject")
     {
         ChatService chatService;
-        //Ö÷¶¯·¢ÆğÊÓÆµÍ¨»°·½
+        //ä¸»åŠ¨å‘èµ·è§†é¢‘é€šè¯æ–¹
         std::string receiveId = jsonMsg["receiver"].asString();
         std::lock_guard<std::mutex> lock(connMutex);
         auto it = onlineUsers.find(receiveId);
@@ -156,11 +169,11 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
 
 
     }
-	//ÊÓÆµÍ¨»°¹Ò¶Ï
+	//è§†é¢‘é€šè¯æŒ‚æ–­
     else if (msgType == "videoCallHangup")
     {
         ChatService chatService;
-        //¶Ô·½
+        //å¯¹æ–¹
         std::string receiveId = jsonMsg["receiver"].asString();
         std::lock_guard<std::mutex> lock(connMutex);
         auto it = onlineUsers.find(receiveId);
@@ -170,7 +183,7 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
             it->second->send(forward);
         }
     }
-	// ÈºÁÄÏûÏ¢´¦Àí
+	// ç¾¤èŠæ¶ˆæ¯å¤„ç†
     else if (msgType == "groupChat")
     {
 		GroupService groupService;
@@ -181,14 +194,14 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
         std::lock_guard<std::mutex> lock(connMutex);
         for (const auto& member : userIds)
         {
-			//ÅĞ¶ÏÓÃ»§ÊÇ·ñÔÚÈºÄÚÇÒÔÚÏßÔò×ª·¢ÏûÏ¢
+			//åˆ¤æ–­ç”¨æˆ·æ˜¯å¦åœ¨ç¾¤å†…ä¸”åœ¨çº¿åˆ™è½¬å‘æ¶ˆæ¯
             auto it = onlineUsers.find(member);
-			// ²»·¢ËÍ¸ø×Ô¼º
+			// ä¸å‘é€ç»™è‡ªå·±
             if (sender == member)
             {
                 continue;
             }
-			//ÓÃ»§ÔÚÏßÔò×ª·¢
+			//ç”¨æˆ·åœ¨çº¿åˆ™è½¬å‘
             if (it != onlineUsers.end() && it->second && it->second->connected())
             {
                 it->second->send(forwardStr);
@@ -197,16 +210,16 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
         return;
 
     }
-	// ÈºÏûÏ¢ÒÑ¶Á»ØÖ´
+	// ç¾¤æ¶ˆæ¯å·²è¯»å›æ‰§
     else if (msgType == "groupChatCallback")
     {
         GroupService groupService;
-        //·´À¡¸øreceiveId ËûµÄÏûÏ¢ÒÑ¶Á
+        //åé¦ˆç»™receiveId ä»–çš„æ¶ˆæ¯å·²è¯»
         std::string receiveId = jsonMsg["receiveId"].asString();
 		std::string forward = groupService.groupMessageRead(jsonMsg);
         std::lock_guard<std::mutex> lock(connMutex);
 		auto it = onlineUsers.find(receiveId);
-		//Èô¶Ô·½ÔÚÏßÔò×ª·¢ÒÑ¶Á»ØÖ´ ²»ÔÚÏßÔòÖ»´¦ÀíÊı¾İ¿âÖĞÒÑ¶Á±ê¼Ç
+		//è‹¥å¯¹æ–¹åœ¨çº¿åˆ™è½¬å‘å·²è¯»å›æ‰§ ä¸åœ¨çº¿åˆ™åªå¤„ç†æ•°æ®åº“ä¸­å·²è¯»æ ‡è®°
         if (it != onlineUsers.end() && it->second && it->second->connected())
         {
             it->second->send(forward);
@@ -221,13 +234,56 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
 
 void ChatWSServer::handleConnectionClosed(const WebSocketConnectionPtr& conn)
 {
-    std::lock_guard<std::mutex> lock(connMutex);
-    for (auto it = onlineUsers.begin(); it != onlineUsers.end(); ++it)
+    std::string disconnectedUser;
     {
-        if (it->second == conn)
+        std::lock_guard<std::mutex> lock(connMutex);
+        for (auto it = onlineUsers.begin(); it != onlineUsers.end(); ++it)
         {
-            onlineUsers.erase(it);
-            break;
+            if (it->second == conn)
+            {
+                disconnectedUser = it->first;
+                onlineUsers.erase(it);
+                break;
+            }
         }
+    }
+
+    // æ—§è¿æ¥å¯èƒ½åœ¨åŒä¸€ç”¨æˆ·é‡è¿åæ‰å…³é—­ï¼Œæ­¤æ—¶ä¸èƒ½æŠŠæ–°ä¼šè¯æ ‡è®°ä¸ºç¦»çº¿ã€‚
+    if (disconnectedUser.empty()) return;
+    HeartbeatManager::GetInstance().handleDisconnect(disconnectedUser);
+    broadcastPresence(disconnectedUser, false);
+}
+
+void ChatWSServer::broadcastPresence(const std::string& userName,
+                                     bool isOnline)
+{
+    std::vector<UserInfo> friends;
+    FriendRelationDao().getAllFriendWithUserId(userName, 1, friends);
+
+    std::vector<WebSocketConnectionPtr> recipients;
+    {
+        std::lock_guard<std::mutex> lock(connMutex);
+        recipients.reserve(friends.size());
+        for (const auto& friendInfo : friends)
+        {
+            const auto it = onlineUsers.find(friendInfo.getUserAccount());
+            if (it != onlineUsers.end() && it->second &&
+                it->second->connected())
+            {
+                recipients.push_back(it->second);
+            }
+        }
+    }
+
+    Json::Value event(Json::objectValue);
+    event["type"] = "presence";
+    event["userName"] = userName;
+    event["onlineStatus"] = isOnline;
+    Json::StreamWriterBuilder writer;
+    writer["indentation"] = "";
+    const std::string payload = Json::writeString(writer, event);
+    for (const auto& recipient : recipients)
+    {
+        recipient->send(payload);
     }
 }

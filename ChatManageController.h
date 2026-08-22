@@ -11,8 +11,8 @@
 #include "GroupService.h"
 using namespace drogon;
 
-// È«¾Ö´æ´¢ÔÚÏßÓÃ»§µÄWebSocketÁ¬½Ó£¨key: userName/userId£©
-// ÕâÀïÖ»ÉùÃ÷£¬¶¨ÒåÔÚ ChatManageController.cpp ÖĞ
+// å…¨å±€å­˜å‚¨åœ¨çº¿ç”¨æˆ·çš„WebSocketè¿æ¥ï¼ˆkey: userName/userIdï¼‰
+// è¿™é‡Œåªå£°æ˜ï¼Œå®šä¹‰åœ¨ ChatManageController.cpp ä¸­
 extern std::unordered_map<std::string, WebSocketConnectionPtr> onlineUsers;
 extern std::mutex connMutex;
 
@@ -23,13 +23,13 @@ public:
         WS_PATH_ADD("/api/chat");
     WS_PATH_LIST_END
 
-    // Ìá¹©»ñÈ¡ÊµÀıµÄ¾²Ì¬º¯Êı
+    // æä¾›è·å–å®ä¾‹çš„é™æ€å‡½æ•°
     static ChatWSServer* GetInstance();
 
-    // °´ÓÃ»§¹Ø±Õ WebSocket Á¬½Ó
+    // æŒ‰ç”¨æˆ·å…³é—­ WebSocket è¿æ¥
     void closeConnectionByUser(const std::string& userName);
 
-    // WebSocketController ½Ó¿ÚÊµÏÖ
+    // WebSocketController æ¥å£å®ç°
     void handleNewConnection(const HttpRequestPtr& req,
         const WebSocketConnectionPtr& conn) override;
 
@@ -41,5 +41,7 @@ public:
     
 
 private:
+    void broadcastPresence(const std::string& userName, bool isOnline);
+
     static ChatWSServer* instance_;
 };
