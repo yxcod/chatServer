@@ -12,19 +12,27 @@ namespace api {
 		ADD_METHOD_TO(FilesController::upLoadFile, "/api/bigFile/upload", Post);
 		ADD_METHOD_TO(FilesController::loadImage, "/api/image/download", Get);
 		ADD_METHOD_TO(FilesController::upLoadImage, "/api/image/upload", Post);
+		ADD_METHOD_TO(FilesController::loadVideo, "/api/video/download", Get);
+		ADD_METHOD_TO(FilesController::upLoadVideo, "/api/video/upload", Post);
 		METHOD_LIST_END
-		//ÎÄ¼şÏÂÔØ
+		//æ–‡ä»¶ä¸‹è½½
 		void downloadFile(const HttpRequestPtr& req,
 				std::function<void(const HttpResponsePtr&)>&& callback);
-		//ÎÄ¼şÉÏ´«
+		//æ–‡ä»¶ä¸Šä¼ 
 		void upLoadFile(const HttpRequestPtr& req,
 			std::function<void(const HttpResponsePtr&)>&& callback);
 
-		//Í¼Æ¬ÏÂÔØ
+		//å›¾ç‰‡ä¸‹è½½
 		void loadImage(const HttpRequestPtr& req,
 			std::function<void(const HttpResponsePtr&)>&& callback);
-		// Í¼Æ¬ÉÏ´«£º¸ù¾İ userName ´´½¨Ä¿Â¼£¬°´ imageName.JPG ±£´æ
+		// å›¾ç‰‡ä¸Šä¼ ï¼šæ ¹æ® userName åˆ›å»ºç›®å½•ï¼ŒæŒ‰ imageName.JPG ä¿å­˜
 		void upLoadImage(const HttpRequestPtr& req,
+			std::function<void(const HttpResponsePtr&)>&& callback);
+
+		// è§†é¢‘ä¸Šä¼ å’Œæ”¯æŒ HTTP Range çš„åœ¨çº¿æ’­æ”¾/ä¸‹è½½ã€‚
+		void loadVideo(const HttpRequestPtr& req,
+			std::function<void(const HttpResponsePtr&)>&& callback);
+		void upLoadVideo(const HttpRequestPtr& req,
 			std::function<void(const HttpResponsePtr&)>&& callback);
 	};
 

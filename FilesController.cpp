@@ -9,7 +9,9 @@
 
 namespace {
 	constexpr std::size_t kMaxImageBytes = 5 * 1024 * 1024;
+	constexpr std::size_t kMaxVideoBytes = 300ULL * 1024 * 1024;
 	const std::filesystem::path kImageRoot = "./imageData";
+	const std::filesystem::path kVideoRoot = "./videoData";
 
 	bool isSafePathSegment(const std::string& value) {
 		if (value.empty() || value == "." || value == ".." || value.size() > 180) {
@@ -54,6 +56,14 @@ namespace {
 		if (mime == "image/png") return extension == ".png";
 		if (mime == "image/webp") return extension == ".webp";
 		return false;
+	}
+
+	std::string detectVideoMime(const std::string& filename, std::string_view data) {
+		const auto extension = lowercase(std::filesystem::path(filename).extension().string());
+		if (data.size() < 12 || data.substr(4, 4) != "ftyp") return {};
+		if (extension == ".mp4" || extension == ".m4v") return "video/mp4";
+		if (extension == ".mov") return "video/quicktime";
+		return {};
 	}
 
 	drogon::HttpResponsePtr jsonResponse(int code,
@@ -354,5 +364,117 @@ namespace api {
 			return;
 		}
 		callback(jsonResponse(104, "Unsupported Content-Type", drogon::k415UnsupportedMediaType));
+	}
+
+	void FilesController::loadVideo(const HttpRequestPtr& req,
+		std::function<void(const HttpResponsePtr&)>&& callback)
+	{
+		const auto ownerId = req->getParameter("userName");
+		const auto videoName = req->getParameter("videoName");
+		if (!isSafePathSegment(ownerId) || !isSafePathSegment(videoName)) {
+			callback(jsonResponse(400, "Invalid video path", drogon::k400BadRequest));
+			return;
+		}
+
+		const auto filePath = FileService::getFilePath(
+			(kVideoRoot / ownerId).string(), videoName);
+		if (!filePath) {
+			callback(jsonResponse(404, "Video not found", drogon::k404NotFound));
+			return;
+		}
+
+		std::ifstream input(*filePath, std::ios::binary);
+		char header[16]{};
+		input.read(header, sizeof(header));
+		const auto mime = detectVideoMime(
+			videoName,
+			std::string_view(header, static_cast<std::size_t>(input.gcount())));
+		if (mime.empty()) {
+			callback(jsonResponse(415, "Unsupported video format", drogon::k415UnsupportedMediaType));
+			return;
+		}
+
+		// 传入原始请求后 Drogon 会用 sendfile 和 Range 响应按需传输，
+		// 不会把整个视频加载到服务端内存。
+		auto response = HttpResponse::newFileResponse(
+			*filePath, "", drogon::CT_CUSTOM, mime, req);
+		response->addHeader("Accept-Ranges", "bytes");
+		response->addHeader("Cache-Control", "private, max-age=31536000, immutable");
+		response->addHeader("X-Content-Type-Options", "nosniff");
+		callback(response);
+	}
+
+	void FilesController::upLoadVideo(const HttpRequestPtr& req,
+		std::function<void(const HttpResponsePtr&)>&& callback)
+	{
+		const auto ownerId = req->getParameter("userName");
+		const auto requestedName = req->getParameter("videoName");
+		if (!isSafePathSegment(ownerId) || !isSafePathSegment(requestedName)) {
+			callback(jsonResponse(105, "Invalid video path", drogon::k400BadRequest));
+			return;
+		}
+		if (req->getContentType() != CT_MULTIPART_FORM_DATA) {
+			callback(jsonResponse(104, "Unsupported Content-Type", drogon::k415UnsupportedMediaType));
+			return;
+		}
+
+		MultiPartParser parser;
+		if (parser.parse(req) != 0) {
+			callback(jsonResponse(101, "Failed to parse video upload", drogon::k400BadRequest));
+			return;
+		}
+		const auto& files = parser.getFiles();
+		if (files.size() != 1) {
+			callback(jsonResponse(102, "Exactly one video is required", drogon::k400BadRequest));
+			return;
+		}
+
+		const auto& video = files[0];
+		if (video.fileLength() == 0 || video.fileLength() > kMaxVideoBytes) {
+			callback(jsonResponse(106, "Video must be between 1 byte and 300 MB", drogon::k413RequestEntityTooLarge));
+			return;
+		}
+		if (video.getFileName() != requestedName) {
+			callback(jsonResponse(107, "Video name mismatch", drogon::k400BadRequest));
+			return;
+		}
+		const auto mime = detectVideoMime(requestedName, video.fileContent());
+		if (mime.empty()) {
+			callback(jsonResponse(108, "Only MP4, M4V and MOV videos are supported", drogon::k415UnsupportedMediaType));
+			return;
+		}
+
+		const auto ownerDir = kVideoRoot / ownerId;
+		std::error_code directoryError;
+		std::filesystem::create_directories(ownerDir, directoryError);
+		if (directoryError) {
+			callback(jsonResponse(103, "Failed to create video directory", drogon::k500InternalServerError));
+			return;
+		}
+
+		const auto destination = ownerDir / requestedName;
+		const auto temporary = ownerDir / (requestedName + ".uploading");
+		if (video.saveAs(temporary.string()) != 0) {
+			callback(jsonResponse(103, "Failed to save video", drogon::k500InternalServerError));
+			return;
+		}
+		std::error_code renameError;
+		std::filesystem::rename(temporary, destination, renameError);
+		if (renameError) {
+			std::error_code removeError;
+			std::filesystem::remove(temporary, removeError);
+			callback(jsonResponse(103, "Failed to finalize video", drogon::k500InternalServerError));
+			return;
+		}
+
+		Json::Value json;
+		json["code"] = 100;
+		json["message"] = "Video uploaded successfully";
+		json["videoName"] = requestedName;
+		json["mimeType"] = mime;
+		json["byteSize"] = static_cast<Json::UInt64>(video.fileLength());
+		auto response = HttpResponse::newHttpJsonResponse(json);
+		response->setStatusCode(drogon::k200OK);
+		callback(response);
 	}
 }

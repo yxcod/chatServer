@@ -75,7 +75,12 @@ void Logger::initService()
     try
     {
         drogon::app().addListener("0.0.0.0", 5555);
-        drogon::app().setClientMaxBodySize(5 * 1024 * 1024);
+        // 为 300MB 视频预留少量 multipart 边界开销；控制器仍严格限制
+        // 单个视频文件不得超过 300MB。超过内存阈值的请求体由 Drogon
+        // 写入临时文件，避免上传时长期占用同等大小的内存。
+        drogon::app()
+            .setClientMaxBodySize(302ULL * 1024 * 1024)
+            .setClientMaxMemoryBodySize(1024 * 1024);
     }
     catch (const std::exception& e)
     {
