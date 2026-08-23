@@ -1,5 +1,4 @@
 #pragma once
-#pragma once
 #include <drogon/HttpController.h>
 #include <openssl/md5.h>
 #include <string>
@@ -24,7 +23,7 @@ public:
 	
 	
 	METHOD_LIST_END
-	// »ñÈ¡ÓÃ»§ËùÓĞÈº×éĞÅÏ¢
+	// è·å–ç”¨æˆ·æ‰€æœ‰ç¾¤ç»„ä¿¡æ¯
 		void getAllGroup(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback)
 	{
 		
@@ -41,35 +40,65 @@ public:
 		
 
 	}
-	//»ñÈ¡ÈºµÄËùÓĞ³ÉÔ±ĞÅÏ¢
+	//è·å–ç¾¤çš„æ‰€æœ‰æˆå‘˜ä¿¡æ¯
 	void getGroupMembers(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback)
 	{
 		auto json = req->getJsonObject();
-		Logger::GetInstance().debugJson(*json);
 		Json::Value response_data;
 		if (!json || !json->isMember("groupId")) {
 			response_data["code"] = 99;
+			response_data["msg"] = "invalid request body";
 			callback(HttpResponse::newHttpJsonResponse(response_data));
 			return;
 		}
-		GroupService groupService;
-		callback(HttpResponse::newHttpJsonResponse(groupService.getGroupMembers(*json)));
+		Logger::GetInstance().debugJson(*json);
+		try {
+			GroupService groupService;
+			callback(HttpResponse::newHttpJsonResponse(groupService.getGroupMembers(*json)));
+		}
+		catch (const std::exception& e) {
+			Logger::GetInstance().error(std::string("getGroupMembers failed: ") + e.what());
+			response_data["code"] = 98;
+			response_data["msg"] = "internal server error";
+			callback(HttpResponse::newHttpJsonResponse(response_data));
+		}
+		catch (...) {
+			Logger::GetInstance().error("getGroupMembers failed: unknown exception");
+			response_data["code"] = 98;
+			response_data["msg"] = "internal server error";
+			callback(HttpResponse::newHttpJsonResponse(response_data));
+		}
 	}
-	//»ñÈ¡ÈºµÄÁÄÌì¼ÇÂ¼
+	//è·å–ç¾¤çš„èŠå¤©è®°å½•
 	void getGroupChatRecord(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback)
 	{
 		auto json = req->getJsonObject();
-		Logger::GetInstance().debugJson(*json);
 		Json::Value response_data;
 		if (!json || !json->isMember("groupId")) {
 			response_data["code"] = 99;
+			response_data["msg"] = "invalid request body";
 			callback(HttpResponse::newHttpJsonResponse(response_data));
 			return;
 		}
-		GroupService groupService;
-		callback(HttpResponse::newHttpJsonResponse(groupService.getGroupChatRecord(*json)));
+		Logger::GetInstance().debugJson(*json);
+		try {
+			GroupService groupService;
+			callback(HttpResponse::newHttpJsonResponse(groupService.getGroupChatRecord(*json)));
+		}
+		catch (const std::exception& e) {
+			Logger::GetInstance().error(std::string("getGroupChatRecord failed: ") + e.what());
+			response_data["code"] = 98;
+			response_data["msg"] = "internal server error";
+			callback(HttpResponse::newHttpJsonResponse(response_data));
+		}
+		catch (...) {
+			Logger::GetInstance().error("getGroupChatRecord failed: unknown exception");
+			response_data["code"] = 98;
+			response_data["msg"] = "internal server error";
+			callback(HttpResponse::newHttpJsonResponse(response_data));
+		}
 	}
-	//»ñÈ¡ÈºµÄ»á»°ÁĞ±í
+	//è·å–ç¾¤çš„ä¼šè¯åˆ—è¡¨
 	void getGroupConversations(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback)
 	{
 		auto json = req->getJsonObject();
@@ -83,7 +112,7 @@ public:
 		GroupService groupService;
 		callback(HttpResponse::newHttpJsonResponse(groupService.getGroupConversations(*json)));
 	}
-	//´´½¨ÈºÁÄ
+	//åˆ›å»ºç¾¤èŠ
 	void createGroup(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback)
 	{
 		auto json = req->getJsonObject();
@@ -97,7 +126,7 @@ public:
 		GroupService groupService;
 		callback(HttpResponse::newHttpJsonResponse(groupService.createGroup(*json)));
 	}
-	//ÈºÌí¼ÓÓÃ»§
+	//ç¾¤æ·»åŠ ç”¨æˆ·
 	void addGroupMember(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback)
 	{
 		auto json = req->getJsonObject();
@@ -113,7 +142,7 @@ public:
 		GroupService groupService;
 		callback(HttpResponse::newHttpJsonResponse(groupService.addGroupMember(*json)));
 	}
-	//ÒÆ³ıÓÃ»§³öÈº
+	//ç§»é™¤ç”¨æˆ·å‡ºç¾¤
 	void minueGroupMember(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback)
 	{
 		auto json = req->getJsonObject();
@@ -128,7 +157,7 @@ public:
 		GroupService groupService;
 		callback(HttpResponse::newHttpJsonResponse(groupService.minuGroupMember(*json)));
 	}
-	//¸üĞÂ³ÉÔ±ÈºĞÅÏ¢
+	//æ›´æ–°æˆå‘˜ç¾¤ä¿¡æ¯
 	void updateGroupMemberInfo(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback)
 	{
 		auto json = req->getJsonObject();
@@ -144,7 +173,7 @@ public:
 		GroupService groupService;
 		callback(HttpResponse::newHttpJsonResponse(groupService.updateGroupMemberInfo(*json)));
 	}
-	//¸üĞÂÈºĞÅÏ¢
+	//æ›´æ–°ç¾¤ä¿¡æ¯
 	void updateGroupInfo(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback)
 	{
 		auto json = req->getJsonObject();

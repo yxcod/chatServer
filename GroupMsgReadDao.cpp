@@ -1,4 +1,5 @@
 #include "GroupMsgReadDao.h"
+#include <sstream>
 
 GroupMsgReadDao::GroupMsgReadDao() = default;
 
@@ -8,14 +9,14 @@ bool GroupMsgReadDao::markRead(const GroupMsgReadModel &model)
     {
         auto con = Logger::GetInstance().createConnection();
 
-        // ¼´Ê¹³õÊ¼»¯Î´¶Á¼ÇÂ¼ÒÅÂ©£¬Ò²ÄÜÍ¨¹ı»ØÖ´²¹½¨ÒÑ¶Á¼ÇÂ¼¡£
+        // å³ä½¿åˆå§‹åŒ–æœªè¯»è®°å½•é—æ¼ï¼Œä¹Ÿèƒ½é€šè¿‡å›æ‰§è¡¥å»ºå·²è¯»è®°å½•ã€‚
         std::unique_ptr<sql::PreparedStatement> pstmt(
             con->prepareStatement(
                 "INSERT INTO groupMsgRead (msgId, userId, readTime) "
                 "VALUES (?, ?, ?) "
                 "ON DUPLICATE KEY UPDATE readTime = VALUES(readTime)"));
 
-        // ÓÅÏÈÊ¹ÓÃ·şÎñ²ãÉú³ÉµÄÊ±¼ä£¬±£Ö¤Êı¾İ¿âÓë»ØÖ´·µ»ØÍêÈ«Ò»ÖÂ¡£
+        // ä¼˜å…ˆä½¿ç”¨æœåŠ¡å±‚ç”Ÿæˆçš„æ—¶é—´ï¼Œä¿è¯æ•°æ®åº“ä¸å›æ‰§è¿”å›å®Œå…¨ä¸€è‡´ã€‚
         uint64_t nowTs = model.getReadTime();
         if (nowTs == 0)
         {
@@ -66,6 +67,57 @@ std::vector<GroupMsgReadModel> GroupMsgReadDao::getReadStatusesByMsg(uint64_t ms
     return result;
 }
 
+std::vector<GroupMsgReadModel> GroupMsgReadDao::getReadStatusesByMessages(
+    const std::vector<uint64_t>& msgIds) const
+{
+    std::vector<GroupMsgReadModel> result;
+    if (msgIds.empty())
+    {
+        return result;
+    }
+
+    try
+    {
+        std::ostringstream placeholders;
+        for (std::size_t i = 0; i < msgIds.size(); ++i)
+        {
+            if (i > 0)
+            {
+                placeholders << ", ";
+            }
+            placeholders << "?";
+        }
+
+        auto con = Logger::GetInstance().createConnection();
+        std::unique_ptr<sql::PreparedStatement> pstmt(
+            con->prepareStatement(
+                "SELECT id, msgId, userId, readTime "
+                "FROM groupMsgRead WHERE msgId IN (" + placeholders.str() + ") "
+                "ORDER BY msgId ASC"));
+
+        for (std::size_t i = 0; i < msgIds.size(); ++i)
+        {
+            pstmt->setUInt64(static_cast<unsigned int>(i + 1), msgIds[i]);
+        }
+
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+        while (res->next())
+        {
+            GroupMsgReadModel model;
+            model.setId(res->getUInt64("id"));
+            model.setMsgId(res->getUInt64("msgId"));
+            model.setUserId(res->getString("userId"));
+            model.setReadTime(res->getUInt64("readTime"));
+            result.push_back(std::move(model));
+        }
+    }
+    catch (const std::exception& e)
+    {
+        Logger::GetInstance().error(e.what());
+    }
+    return result;
+}
+
 std::vector<GroupMsgReadModel> GroupMsgReadDao::getReadersByMsg(uint64_t msgId) const
 {
     std::vector<GroupMsgReadModel> result;
@@ -76,7 +128,7 @@ std::vector<GroupMsgReadModel> GroupMsgReadDao::getReadersByMsg(uint64_t msgId) 
             con->prepareStatement(
                 "SELECT id, msgId, userId, readTime "
                 "FROM groupMsgRead "
-                "WHERE msgId = ? AND readTime > 0"));  // Ö»ÒªÒÑ¶Á¼ÇÂ¼
+                "WHERE msgId = ? AND readTime > 0"));  // åªè¦å·²è¯»è®°å½•
 
         pstmt->setUInt64(1, msgId);
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
@@ -86,7 +138,7 @@ std::vector<GroupMsgReadModel> GroupMsgReadDao::getReadersByMsg(uint64_t msgId) 
             m.setId(res->getUInt64("id"));
             m.setMsgId(res->getUInt64("msgId"));
             m.setUserId(res->getString("userId"));
-            m.setReadTime(res->getUInt64("readTime"));  // Ê±¼ä´Á
+            m.setReadTime(res->getUInt64("readTime"));  // æ—¶é—´æˆ³
             result.push_back(std::move(m));
         }
     }
@@ -112,7 +164,7 @@ std::vector<GroupMsgReadModel> GroupMsgReadDao::getUserReadRecords(const std::st
                 "WHERE userId = ? AND msgId BETWEEN ? AND ? "
                 "ORDER BY msgId ASC"));
 
-        pstmt->setString(1, userId);                      // ¸ÄÎª string
+        pstmt->setString(1, userId);                      // æ”¹ä¸º string
         pstmt->setUInt64(2, msgIdBegin);
         pstmt->setUInt64(3, msgIdEnd);
 
@@ -122,7 +174,7 @@ std::vector<GroupMsgReadModel> GroupMsgReadDao::getUserReadRecords(const std::st
             GroupMsgReadModel m;
             m.setId(res->getUInt64("id"));
             m.setMsgId(res->getUInt64("msgId"));
-            m.setUserId(res->getString("userId"));        // ¸ÄÎª string
+            m.setUserId(res->getString("userId"));        // æ”¹ä¸º string
             m.setReadTime(res->getUInt64("readTime"));
             result.push_back(std::move(m));
         }
@@ -146,7 +198,7 @@ bool GroupMsgReadDao::insert(GroupMsgReadModel& model)
 
         pstmt->setUInt64(1, model.getMsgId());
         pstmt->setString(2, model.getUserId());
-        pstmt->setUInt64(3, model.getReadTime());   // Ê±¼ä´Á
+        pstmt->setUInt64(3, model.getReadTime());   // æ—¶é—´æˆ³
 
         pstmt->executeUpdate();
 
@@ -176,7 +228,7 @@ bool GroupMsgReadDao::insertBatch(const std::vector<GroupMsgReadModel>& models)
     {
         auto con = Logger::GetInstance().createConnection();
 
-        // ¹¹ÔìÒ»ÌõÅúÁ¿ INSERT SQL£º
+        // æ„é€ ä¸€æ¡æ‰¹é‡ INSERT SQLï¼š
         // INSERT INTO groupMsgRead (msgId, userId, readTime)
         // VALUES (?, ?, FROM_UNIXTIME(?)), (?, ?, FROM_UNIXTIME(?)), ...
         std::ostringstream oss;
@@ -194,8 +246,8 @@ bool GroupMsgReadDao::insertBatch(const std::vector<GroupMsgReadModel>& models)
         std::unique_ptr<sql::PreparedStatement> pstmt(
             con->prepareStatement(oss.str()));
 
-        // °ó¶¨²ÎÊı
-        // ¶ÔÓÚµÚ i Ìõ¼ÇÂ¼£¨0-based£©£¬Æä²ÎÊıÏÂ±êÎª£º3*i+1, 3*i+2, 3*i+3
+        // ç»‘å®šå‚æ•°
+        // å¯¹äºç¬¬ i æ¡è®°å½•ï¼ˆ0-basedï¼‰ï¼Œå…¶å‚æ•°ä¸‹æ ‡ä¸ºï¼š3*i+1, 3*i+2, 3*i+3
         for (std::size_t i = 0; i < n; ++i)
         {
             const auto& m = models[i];
@@ -224,7 +276,7 @@ bool GroupMsgReadDao::deleteByMsgId(uint64_t msgId)
 
         pstmt->setUInt64(1, msgId);
 
-        // Ã»ÓĞ¼ÇÂ¼Ê± DELETE Ò²»á·µ»Ø 0 ĞĞ£¬ÕâÀï°´ÄãµÄ Dao ·ç¸ñÖ±½ÓÈÏÎªÖ´ĞĞ³É¹¦¼´¿É
+        // æ²¡æœ‰è®°å½•æ—¶ DELETE ä¹Ÿä¼šè¿”å› 0 è¡Œï¼Œè¿™é‡ŒæŒ‰ä½ çš„ Dao é£æ ¼ç›´æ¥è®¤ä¸ºæ‰§è¡ŒæˆåŠŸå³å¯
         pstmt->executeUpdate();
         return true;
     }

@@ -2,6 +2,7 @@
 #include"Logger.h"
 #include "UserInfoDao.h"
 #include <algorithm>
+#include <unordered_map>
 Json::Value GroupService::getAllGroups(const Json::Value& groupInfo)
 {
 	// 获取用户所有群组信息
@@ -88,6 +89,11 @@ Json::Value GroupService::getGroupChatRecord(const Json::Value& groupInfo)
 	Json::Value response;
 	response["code"] = 101;
 	int groupId = groupInfo["groupId"].asInt();
+	if (groupId <= 0)
+	{
+		response["msg"] = "invalid groupId";
+		return response;
+	}
 	uint64_t groupId64 = static_cast<uint64_t>(groupId);
 
 	// 2. 查询该群所有消息
@@ -105,8 +111,20 @@ Json::Value GroupService::getGroupChatRecord(const Json::Value& groupInfo)
 	auto messages = msgDao.getRecentMessages(
 		groupId64, static_cast<std::size_t>(messageLimit));
 
-	// 3. 为每条消息查已读信息
+	// 3. 批量查询所有消息的已读信息，避免 N+1 查询压垮连接池。
 	GroupMsgReadDao readDao;
+	std::vector<uint64_t> messageIds;
+	messageIds.reserve(messages.size());
+	for (const auto& message : messages)
+	{
+		messageIds.push_back(message.getMsgId());
+	}
+	const auto allReadStatuses = readDao.getReadStatusesByMessages(messageIds);
+	std::unordered_map<uint64_t, std::vector<GroupMsgReadModel>> readStatusesByMessage;
+	for (const auto& status : allReadStatuses)
+	{
+		readStatusesByMessage[status.getMsgId()].push_back(status);
+	}
 
 	Json::Value msgArray(Json::arrayValue);
 	for (const auto& m : messages)
@@ -123,21 +141,24 @@ Json::Value GroupService::getGroupChatRecord(const Json::Value& groupInfo)
 		msgJson["isRead"] = static_cast<int>(m.getIsRead());
 
 		// 3.1 一次查询完整阅读状态，再拆分为已读和未读用户。
-		auto readStatuses = readDao.getReadStatusesByMsg(m.getMsgId());
+		const auto statusIt = readStatusesByMessage.find(m.getMsgId());
 		Json::Value readArray(Json::arrayValue);
 		Json::Value unreadArray(Json::arrayValue);
-		for (const auto& r : readStatuses)
+		if (statusIt != readStatusesByMessage.end())
 		{
-			Json::Value rJson;
-			rJson["userId"] = r.getUserId();
-			rJson["readTime"] = Json::UInt64(r.getReadTime());
-			if (r.getReadTime() > 0)
+			for (const auto& r : statusIt->second)
 			{
-				readArray.append(rJson);
-			}
-			else
-			{
-				unreadArray.append(rJson);
+				Json::Value rJson;
+				rJson["userId"] = r.getUserId();
+				rJson["readTime"] = Json::UInt64(r.getReadTime());
+				if (r.getReadTime() > 0)
+				{
+					readArray.append(rJson);
+				}
+				else
+				{
+					unreadArray.append(rJson);
+				}
 			}
 		}
 		msgJson["readers"] = readArray;

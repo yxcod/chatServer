@@ -9,26 +9,30 @@ class GroupMsgReadDao
 {
 public:
     GroupMsgReadDao();
-	// ²åÈëÒ»ÌõÒÑ¶Á¼ÇÂ¼£¬·µ»ØÊÇ·ñ³É¹¦£¨³É¹¦ºó model »á°üº¬×ÔÔö id£©
+	// æ’å…¥ä¸€æ¡å·²è¯»è®°å½•ï¼Œè¿”å›æ˜¯å¦æˆåŠŸï¼ˆæˆåŠŸå model ä¼šåŒ…å«è‡ªå¢ idï¼‰
     bool insert(GroupMsgReadModel& model);
 
-    // ±ê¼Ç¼ÇÂ¼ÒÑ¶Á£¨ÀûÓÃÎ¨Ò»¼ü msgId+userId£¬¸üĞÂ readTime£©
+    // æ ‡è®°è®°å½•å·²è¯»ï¼ˆåˆ©ç”¨å”¯ä¸€é”® msgId+userIdï¼Œæ›´æ–° readTimeï¼‰
     bool markRead(const GroupMsgReadModel& model);
 
-    // ²éÑ¯Ä³ÌõÏûÏ¢ËùÓĞÒÑ¶ÁÓÃ»§
+    // æŸ¥è¯¢æŸæ¡æ¶ˆæ¯æ‰€æœ‰å·²è¯»ç”¨æˆ·
     std::vector<GroupMsgReadModel> getReadersByMsg(uint64_t msgId) const;
 
-    // ²éÑ¯Ä³ÌõÏûÏ¢µÄÍêÕûÔÄ¶Á×´Ì¬£¬ÓÉ·şÎñ²ã²ğ·ÖÒÑ¶ÁºÍÎ´¶ÁÓÃ»§¡£
+    // æŸ¥è¯¢æŸæ¡æ¶ˆæ¯çš„å®Œæ•´é˜…è¯»çŠ¶æ€ï¼Œç”±æœåŠ¡å±‚æ‹†åˆ†å·²è¯»å’Œæœªè¯»ç”¨æˆ·ã€‚
     std::vector<GroupMsgReadModel> getReadStatusesByMsg(uint64_t msgId) const;
 
-    // ²éÑ¯ÓÃ»§¶ÔÄ³ÈºÏûÏ¢µÄÒÑ¶Á¼ÇÂ¼£¨¿ÉÑ¡£©
+    // ä¸€æ¬¡æŸ¥è¯¢å¤šæ¡æ¶ˆæ¯çš„é˜…è¯»çŠ¶æ€ï¼Œé¿å…æ‰“å¼€ç¾¤èŠæ—¶é€æ¡è®¿é—®æ•°æ®åº“ã€‚
+    std::vector<GroupMsgReadModel> getReadStatusesByMessages(
+        const std::vector<uint64_t>& msgIds) const;
+
+    // æŸ¥è¯¢ç”¨æˆ·å¯¹æŸç¾¤æ¶ˆæ¯çš„å·²è¯»è®°å½•ï¼ˆå¯é€‰ï¼‰
     std::vector<GroupMsgReadModel> getUserReadRecords(const std::string& userId,
                                                       uint64_t msgIdBegin,
                                                       uint64_t msgIdEnd) const;
-    // ÅúÁ¿²åÈë¶àÌõÒÑ¶Á¼ÇÂ¼£¨Ê¹ÓÃÒ»ÌõÅúÁ¿ INSERT SQL£©
+    // æ‰¹é‡æ’å…¥å¤šæ¡å·²è¯»è®°å½•ï¼ˆä½¿ç”¨ä¸€æ¡æ‰¹é‡ INSERT SQLï¼‰
     bool insertBatch(const std::vector<GroupMsgReadModel>& models);
 
-    // ¸ù¾İ msgId É¾³ıËùÓĞ¶ÔÓ¦µÄÒÑ¶Á¼ÇÂ¼
+    // æ ¹æ® msgId åˆ é™¤æ‰€æœ‰å¯¹åº”çš„å·²è¯»è®°å½•
     bool deleteByMsgId(uint64_t msgId);
 private:
 };

@@ -213,11 +213,13 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
             it->second->send(forward);
         }
     }
-	// 群聊消息处理
+    // 群聊消息处理
     else if (msgType == "groupChat")
     {
-		GroupService groupService;
-        std::string sender = jsonMsg["sendUserId"].asString();
+		try
+		{
+			GroupService groupService;
+			std::string sender = jsonMsg["sendUserId"].asString();
 		if (connectedUserName(conn) != sender)
 		{
 			Json::Value failure = jsonMsg;
@@ -257,13 +259,30 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
 		Json::Value acknowledgement = result;
 		acknowledgement["type"] = "groupChatCallback";
 		conn->send(jsonString(acknowledgement));
+		}
+		catch (const std::exception& e)
+		{
+			Logger::GetInstance().error(std::string("groupChat failed: ") + e.what());
+			Json::Value failure = jsonMsg;
+			failure["type"] = "groupChatCallback";
+			failure["code"] = 101;
+			failure["clientMsgId"] = jsonMsg["msgId"];
+			failure["error"] = "group message processing failed";
+			if (conn && conn->connected()) conn->send(jsonString(failure));
+		}
+		catch (...)
+		{
+			Logger::GetInstance().error("groupChat failed: unknown exception");
+		}
         return;
 
     }
 	// 群消息已读回执
     else if (msgType == "groupChatCallback")
     {
-        GroupService groupService;
+		try
+		{
+			GroupService groupService;
 		const std::string reader = jsonMsg["sender"].asString();
 		if (connectedUserName(conn) != reader) return;
 		const int groupId = jsonMsg.get(
@@ -280,6 +299,15 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
         {
             it->second->send(forward);
         }
+		}
+		catch (const std::exception& e)
+		{
+			Logger::GetInstance().error(std::string("groupChatCallback failed: ") + e.what());
+		}
+		catch (...)
+		{
+			Logger::GetInstance().error("groupChatCallback failed: unknown exception");
+		}
         return;
 
     }
