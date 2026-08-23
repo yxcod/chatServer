@@ -100,7 +100,7 @@ public:
 			callback(HttpResponse::newHttpJsonResponse(response_data));
 		}
 	}
-	// 群主删除全群聊天记录
+	// 群主或管理员删除全群聊天记录
 	void deleteGroupChatHistory(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback)
 	{
 		auto json = req->getJsonObject();
@@ -183,7 +183,6 @@ public:
 	void minueGroupMember(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback)
 	{
 		auto json = req->getJsonObject();
-		Logger::GetInstance().debugJson(*json);
 		Json::Value response_data;
 		if (!json || !json->isMember("userNames") || !json->isMember("groupId"))
 		{
@@ -191,24 +190,71 @@ public:
 			callback(HttpResponse::newHttpJsonResponse(response_data));
 			return;
 		}
+		const auto authenticatedUser = getAuthenticatedUser(req);
+		if (!authenticatedUser)
+		{
+			response_data["code"] = 401;
+			response_data["msg"] = "unauthorized";
+			auto response = HttpResponse::newHttpJsonResponse(response_data);
+			response->setStatusCode(k401Unauthorized);
+			callback(response);
+			return;
+		}
+		Json::Value request = *json;
+		request["operatorId"] = *authenticatedUser;
+		Logger::GetInstance().debugJson(request);
 		GroupService groupService;
-		callback(HttpResponse::newHttpJsonResponse(groupService.minuGroupMember(*json)));
+		const Json::Value result = groupService.minuGroupMember(request);
+		if (result["code"].asInt() == 100 && result["removedUsers"].isArray())
+		{
+			std::vector<std::string> removedUsers;
+			for (const auto& user : result["removedUsers"])
+			{
+				if (user.isString()) removedUsers.push_back(user.asString());
+			}
+			ChatWSServer::notifyGroupMembersRemoved(
+				removedUsers, request["groupId"].asUInt64(), *authenticatedUser);
+		}
+		callback(HttpResponse::newHttpJsonResponse(result));
 	}
 	//更新成员群信息
 	void updateGroupMemberInfo(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback)
 	{
 		auto json = req->getJsonObject();
-		Logger::GetInstance().debugJson(*json);
 		Json::Value response_data;
-		if (!json->isMember("groupId") ||
+		if (!json || !json->isMember("groupId") ||
 			!json->isMember("userName")) 
 		{
 			response_data["code"] = 99;
 			callback(HttpResponse::newHttpJsonResponse(response_data));
 			return;
 		}
+		const auto authenticatedUser = getAuthenticatedUser(req);
+		if (!authenticatedUser)
+		{
+			response_data["code"] = 401;
+			response_data["msg"] = "unauthorized";
+			auto response = HttpResponse::newHttpJsonResponse(response_data);
+			response->setStatusCode(k401Unauthorized);
+			callback(response);
+			return;
+		}
+		Json::Value request = *json;
+		request["operatorId"] = *authenticatedUser;
+		Logger::GetInstance().debugJson(request);
 		GroupService groupService;
-		callback(HttpResponse::newHttpJsonResponse(groupService.updateGroupMemberInfo(*json)));
+		const Json::Value result = groupService.updateGroupMemberInfo(request);
+		if (result["code"].asInt() == 100 && request.isMember("role"))
+		{
+			const auto members = groupService.getUserIds(request["groupId"].asInt());
+			ChatWSServer::notifyGroupMemberRoleUpdated(
+				members,
+				request["groupId"].asUInt64(),
+				request["userName"].asString(),
+				static_cast<uint8_t>(request["role"].asUInt()),
+				*authenticatedUser);
+		}
+		callback(HttpResponse::newHttpJsonResponse(result));
 	}
 	//更新群信息
 	void updateGroupInfo(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback)

@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <string>
+#include <optional>
 #include "Logger.h"
 #include "GroupMemberModel.h"
 
@@ -10,29 +11,33 @@ class GroupMemberDao
 public:
     GroupMemberDao();
 
-    // ¼ÓÈº£¨ÒÑ¾­´æÔÚÔò¸üĞÂ isQuit£©
+    // åŠ ç¾¤ï¼ˆå·²ç»å­˜åœ¨åˆ™æ›´æ–° isQuitï¼‰
     bool addMember(GroupMemberModel &member);
 
-    // ¸ù¾İ groupId ²éÑ¯ËùÓĞ³ÉÔ±
+    // æ ¹æ® groupId æŸ¥è¯¢æ‰€æœ‰æˆå‘˜
     std::vector<GroupMemberModel> getMembersByGroup(uint64_t groupId) const;
 
-    // ¸ù¾İ userId ²éÑ¯¼ÓÈëµÄËùÓĞÈº
+    // æ ¹æ® userId æŸ¥è¯¢åŠ å…¥çš„æ‰€æœ‰ç¾¤
     std::vector<GroupMemberModel> getGroupsByUser(const std::string& userId) const;
 
-    // ±ê¼Ç³ÉÔ±ÍË³öÈº
+    // æ ‡è®°æˆå‘˜é€€å‡ºç¾¤
     bool markQuit(uint64_t groupId, const std::string& userId, uint64_t quitTime);
-    // ÅĞ¶ÏÄ³ user ÊÇ·ñÔÚÖ¸¶¨ÈºÖĞ£¨¿É¸ù¾İĞèÒªÅÅ³ıÒÑÍË³ö³ÉÔ±£©
+    // åˆ¤æ–­æŸ user æ˜¯å¦åœ¨æŒ‡å®šç¾¤ä¸­ï¼ˆå¯æ ¹æ®éœ€è¦æ’é™¤å·²é€€å‡ºæˆå‘˜ï¼‰
     bool isUserInGroup(uint64_t groupId, const std::string& userId) const;
-    // ¸üĞÂÓÃ»§ÔÚÈºÄÚµÄêÇ³Æ£¨groupNickName£©
+    // è¿”å›æœ‰æ•ˆç¾¤æˆå‘˜çš„è§’è‰²ï¼š0-æ™®é€šæˆå‘˜ï¼Œ1-ç®¡ç†å‘˜ï¼Œ2-ç¾¤ä¸»ã€‚
+    std::optional<uint8_t> getActiveMemberRole(
+        uint64_t groupId,
+        const std::string& userId) const;
+    // æ›´æ–°ç”¨æˆ·åœ¨ç¾¤å†…çš„æ˜µç§°ï¼ˆgroupNickNameï¼‰
     bool updateGroupNickName(uint64_t groupId,
         const std::string& userId,
         const std::string& groupNickName);
 
-    // ¸üĞÂÓÃ»§ÔÚÈºÄÚµÄÉí·İ£¨role£º0-ÆÕÍ¨³ÉÔ± 1-¹ÜÀíÔ± 2-ÈºÖ÷£©
+    // æ›´æ–°ç”¨æˆ·åœ¨ç¾¤å†…çš„èº«ä»½ï¼ˆroleï¼š0-æ™®é€šæˆå‘˜ 1-ç®¡ç†å‘˜ 2-ç¾¤ä¸»ï¼‰
     bool updateGroupRole(uint64_t groupId,
         const std::string& userId,
         uint8_t role);
-    // ¸ù¾İ groupId É¾³ı¸ÃÈºµÄËùÓĞ³ÉÔ±¼ÇÂ¼
+    // æ ¹æ® groupId åˆ é™¤è¯¥ç¾¤çš„æ‰€æœ‰æˆå‘˜è®°å½•
     bool deleteByGroupId(uint64_t groupId);
 
 private:

@@ -58,7 +58,7 @@ Json::Value GroupService::deleteGroupChatHistory(const Json::Value& groupInfo)
 	else if (status == -1)
 	{
 		response["code"] = 103;
-		response["msg"] = "only the group owner can delete group history";
+		response["msg"] = "only the group owner or an administrator can delete group history";
 	}
 	else
 	{
@@ -422,7 +422,15 @@ Json::Value GroupService::minuGroupMember(const Json::Value& memberInfo)
 
 	GroupChatDao groupChatDao;
 	GroupMemberDao groupMemberDao;
-	UserInfoDao userInfoDao;
+	const std::string operatorId = memberInfo["operatorId"].asString();
+	const auto operatorRole = groupMemberDao.getActiveMemberRole(
+		groupId64, operatorId);
+	if (!operatorRole)
+	{
+		response["code"] = 103;
+		response["msg"] = "operator is not an active group member";
+		return response;
+	}
 
 	// 2. 检查群是否存在
 	if (!groupChatDao.groupExists(groupId64))
@@ -442,6 +450,7 @@ Json::Value GroupService::minuGroupMember(const Json::Value& memberInfo)
 	// 3. 逐个处理用户
 	Json::Value resultArray(Json::arrayValue);
 	bool anySuccess = false;
+	Json::Value removedUsers(Json::arrayValue);
 
 	for (const auto& userNode : users)
 	{
@@ -465,11 +474,34 @@ Json::Value GroupService::minuGroupMember(const Json::Value& memberInfo)
 			continue;
 		}
 
+		const auto targetRole = groupMemberDao.getActiveMemberRole(
+			groupId64, userId);
+		if (!targetRole)
+		{
+			itemResult["code"] = 104;
+			itemResult["msg"] = "target is not an active group member";
+			resultArray.append(itemResult);
+			continue;
+		}
+
+		const bool leavingVoluntarily = userId == operatorId;
+		const bool canRemoveTarget = *operatorRole == 2
+			? *targetRole < 2
+			: (*operatorRole == 1 && *targetRole == 0);
+		if (!leavingVoluntarily && !canRemoveTarget)
+		{
+			itemResult["code"] = 103;
+			itemResult["msg"] = "insufficient permission for target role";
+			resultArray.append(itemResult);
+			continue;
+		}
+
 		// 先标记用户退群
 		if (groupMemberDao.markQuit(groupId64, userId, Logger::GetInstance().getcurrentTime()))
 		{
 			anySuccess = true;
 			itemResult["code"] = 100;
+			removedUsers.append(userId);
 
 			// 如果这个被移除的用户是群创建者，则后面触发解散群逻辑
 			if (!creatorId.empty() && userId == creatorId)
@@ -507,6 +539,7 @@ Json::Value GroupService::minuGroupMember(const Json::Value& memberInfo)
 	response["groupId"] = Json::UInt64(groupId64);
 	// 返回每个用户的处理结果
 	response["results"] = resultArray;
+	response["removedUsers"] = removedUsers;
 	return response;
 }
 
@@ -517,9 +550,23 @@ Json::Value GroupService::updateGroupMemberInfo(const Json::Value& memberInfo)
 	GroupMemberDao groupMemberDao;
 	uint64_t groupId = memberInfo["groupId"].asUInt64();
 	std::string userId = memberInfo["userName"].asString();
+	const std::string operatorId = memberInfo["operatorId"].asString();
+	const auto operatorRole = groupMemberDao.getActiveMemberRole(groupId, operatorId);
+	if (!operatorRole)
+	{
+		response["code"] = 103;
+		response["msg"] = "operator is not an active group member";
+		return response;
+	}
 	//更新成员昵称
 	if (memberInfo.isMember("nickName"))
 	{
+		if (operatorId != userId)
+		{
+			response["code"] = 103;
+			response["msg"] = "members can only update their own nickname";
+			return response;
+		}
 		std::string nickName = memberInfo["nickName"].asString();
 		if (groupMemberDao.updateGroupNickName(groupId, userId, nickName))
 		{
@@ -532,9 +579,20 @@ Json::Value GroupService::updateGroupMemberInfo(const Json::Value& memberInfo)
 	if (memberInfo.isMember("role"))
 	{
 		int roleId = memberInfo["role"].asInt();
+		const auto targetRole = groupMemberDao.getActiveMemberRole(groupId, userId);
+		if (*operatorRole != 2 || !targetRole || *targetRole == 2 ||
+			(roleId != 0 && roleId != 1))
+		{
+			response["code"] = 103;
+			response["msg"] = "only the group owner can change member roles";
+			return response;
+		}
 		if (groupMemberDao.updateGroupRole(groupId, userId, roleId))
 		{
 			response["code"] = 100;
+			response["groupId"] = Json::UInt64(groupId);
+			response["userName"] = userId;
+			response["role"] = roleId;
 			return response;
 		}
 

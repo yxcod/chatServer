@@ -367,7 +367,7 @@ int GroupMessageDao::deleteGroupChatHistory(
         ownerStmt->setUInt64(1, groupId);
         ownerStmt->setString(2, requesterId);
         std::unique_ptr<sql::ResultSet> ownerResult(ownerStmt->executeQuery());
-        if (!ownerResult->next() || ownerResult->getUInt("role") != 2)
+        if (!ownerResult->next() || ownerResult->getUInt("role") < 1)
         {
             con->rollback();
             con->setAutoCommit(true);

@@ -8,7 +8,7 @@ bool GroupMemberDao::addMember(GroupMemberModel& member)
     {
         auto con = Logger::GetInstance().createConnection();
 
-        // (groupId, userId) Î¨Ò»£º²»´æÔÚÔò²åÈë£»´æÔÚÔòÖ»°Ñ isQuit ÖÃÎª 0
+        // (groupId, userId) å”¯ä¸€ï¼šä¸å­˜åœ¨åˆ™æ’å…¥ï¼›å­˜åœ¨åˆ™åªæŠŠ isQuit ç½®ä¸º 0
         std::unique_ptr<sql::PreparedStatement> pstmt(
             con->prepareStatement(
                 "INSERT INTO groupMember "
@@ -20,9 +20,9 @@ bool GroupMemberDao::addMember(GroupMemberModel& member)
         pstmt->setUInt64(1, member.getGroupId());
         pstmt->setString(2, member.getUserId());
         pstmt->setUInt(3, member.getRole());
-        // ÕâÀïÖ±½ÓĞ´Ê±¼ä´Á£¨BIGINT£©
+        // è¿™é‡Œç›´æ¥å†™æ—¶é—´æˆ³ï¼ˆBIGINTï¼‰
         pstmt->setUInt64(4, member.getJoinTime());
-        pstmt->setUInt64(5, member.getQuitTime());   // Î´ÍË³ö¿ÉÔ¼¶¨Îª 0
+        pstmt->setUInt64(5, member.getQuitTime());   // æœªé€€å‡ºå¯çº¦å®šä¸º 0
         pstmt->setUInt(6, member.getIsQuit());
         pstmt->setString(7, member.getGroupNickName());
 
@@ -70,7 +70,7 @@ std::vector<GroupMemberModel> GroupMemberDao::getMembersByGroup(uint64_t groupId
             m.setGroupId(res->getUInt64("groupId"));
             m.setUserId(res->getString("userId"));
             m.setRole(static_cast<uint8_t>(res->getUInt("role")));
-            m.setJoinTime(res->getUInt64("joinTime"));   // Ö±½ÓÈ¡ BIGINT
+            m.setJoinTime(res->getUInt64("joinTime"));   // ç›´æ¥å– BIGINT
             m.setQuitTime(res->getUInt64("quitTime"));
             m.setIsQuit(static_cast<uint8_t>(res->getUInt("isQuit")));
             m.setGroupNickName(res->getString("groupNickName"));
@@ -130,9 +130,9 @@ bool GroupMemberDao::markQuit(uint64_t groupId, const std::string& userId, uint6
             con->prepareStatement(
                 "UPDATE groupMember "
                 "SET quitTime = ?, isQuit = 1 "
-                "WHERE groupId = ? AND userId = ?"));
+                "WHERE groupId = ? AND userId = ? AND isQuit = 0"));
 
-        pstmt->setUInt64(1, quitTime);   // BIGINT Ê±¼ä´Á
+        pstmt->setUInt64(1, quitTime);   // BIGINT æ—¶é—´æˆ³
         pstmt->setUInt64(2, groupId);
         pstmt->setString(3, userId);
 
@@ -152,7 +152,7 @@ bool GroupMemberDao::isUserInGroup(uint64_t groupId, const std::string& userId) 
         auto con = Logger::GetInstance().createConnection();
         std::unique_ptr<sql::PreparedStatement> pstmt(
             con->prepareStatement(
-                // ÈçĞèÅÅ³ıÒÑÍË³ö³ÉÔ±£¬¿É¸ÄÎª: WHERE groupId = ? AND userId = ? AND isQuit = 0
+                // å¦‚éœ€æ’é™¤å·²é€€å‡ºæˆå‘˜ï¼Œå¯æ”¹ä¸º: WHERE groupId = ? AND userId = ? AND isQuit = 0
                 "SELECT 1 FROM groupMember "
                 "WHERE groupId = ? AND userId = ? AND isQuit = 0 LIMIT 1"));
 
@@ -160,7 +160,7 @@ bool GroupMemberDao::isUserInGroup(uint64_t groupId, const std::string& userId) 
         pstmt->setString(2, userId);
 
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-        // ´æÔÚÒ»ĞĞ¼´±íÊ¾ÔÚÈºÀï
+        // å­˜åœ¨ä¸€è¡Œå³è¡¨ç¤ºåœ¨ç¾¤é‡Œ
         return res->next();
     }
     catch (const std::exception& e)
@@ -169,7 +169,32 @@ bool GroupMemberDao::isUserInGroup(uint64_t groupId, const std::string& userId) 
     }
     return false;
 }
-// ¸üĞÂÓÃ»§ÔÚÈºÄÚµÄêÇ³Æ
+
+std::optional<uint8_t> GroupMemberDao::getActiveMemberRole(
+    uint64_t groupId,
+    const std::string& userId) const
+{
+    try
+    {
+        auto con = Logger::GetInstance().createConnection();
+        std::unique_ptr<sql::PreparedStatement> pstmt(
+            con->prepareStatement(
+                "SELECT role FROM groupMember "
+                "WHERE groupId = ? AND userId = ? AND isQuit = 0 LIMIT 1"));
+        pstmt->setUInt64(1, groupId);
+        pstmt->setString(2, userId);
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+        if (!res->next()) return std::nullopt;
+        return static_cast<uint8_t>(res->getUInt("role"));
+    }
+    catch (const std::exception& e)
+    {
+        Logger::GetInstance().error(
+            std::string("getActiveMemberRole failed: ") + e.what());
+    }
+    return std::nullopt;
+}
+// æ›´æ–°ç”¨æˆ·åœ¨ç¾¤å†…çš„æ˜µç§°
 bool GroupMemberDao::updateGroupNickName(uint64_t groupId,
     const std::string& userId,
     const std::string& groupNickName)
@@ -196,7 +221,7 @@ bool GroupMemberDao::updateGroupNickName(uint64_t groupId,
     return false;
 }
 
-// ¸üĞÂÓÃ»§ÔÚÈºÄÚµÄÉí·İ
+// æ›´æ–°ç”¨æˆ·åœ¨ç¾¤å†…çš„èº«ä»½
 bool GroupMemberDao::updateGroupRole(uint64_t groupId,
     const std::string& userId,
     uint8_t role)
@@ -208,7 +233,7 @@ bool GroupMemberDao::updateGroupRole(uint64_t groupId,
             con->prepareStatement(
                 "UPDATE groupMember "
                 "SET role = ? "
-                "WHERE groupId = ? AND userId = ?"));
+                "WHERE groupId = ? AND userId = ? AND isQuit = 0"));
 
         pstmt->setUInt(1, role);
         pstmt->setUInt64(2, groupId);
@@ -233,7 +258,7 @@ bool GroupMemberDao::deleteByGroupId(uint64_t groupId)
 
         pstmt->setUInt64(1, groupId);
 
-        // ÊÜÓ°ÏìĞĞÊı >= 0 ¶¼ÈÏÎª³É¹¦£¨Èç¹ûÃ»ÓĞĞĞÒ²²»Ëã´íÎó£©
+        // å—å½±å“è¡Œæ•° >= 0 éƒ½è®¤ä¸ºæˆåŠŸï¼ˆå¦‚æœæ²¡æœ‰è¡Œä¹Ÿä¸ç®—é”™è¯¯ï¼‰
         pstmt->executeUpdate();
         return true;
     }
