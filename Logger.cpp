@@ -258,11 +258,13 @@ void Logger::createDataDirectories(const std::string& name) const
     const fs::path imageBase = base / "imageData";
     const fs::path videoBase = base / "videoData";
     const fs::path fileBase = base / "fileData";
+    const fs::path groupResourceBase = base / "groupResourceData";
 
     // 先确保三个基础目录存在（不存在就创建）
     fs::create_directories(imageBase);
     fs::create_directories(videoBase);
     fs::create_directories(fileBase);
+    fs::create_directories(groupResourceBase);
 
     // 在每个基础目录下创建以 name 命名的子目录（已存在不会报错）
     fs::create_directories(imageBase / name);

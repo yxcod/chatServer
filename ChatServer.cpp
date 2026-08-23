@@ -9,6 +9,7 @@
 #include"FriendController.h"
 #include"GroupController.h"
 #include "MomentController.h"
+#include "GroupResourceController.h"
 #include <cstdlib>
 using namespace drogon;
 

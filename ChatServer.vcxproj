@@ -156,6 +156,8 @@
     <ClCompile Include="GroupMemberDao.cpp" />
     <ClCompile Include="GroupMessageDao.cpp" />
     <ClCompile Include="GroupMsgReadDao.cpp" />
+    <ClCompile Include="GroupResourceController.cpp" />
+    <ClCompile Include="GroupResourceDao.cpp" />
     <ClCompile Include="GroupService.cpp" />
     <ClCompile Include="HeartbeatManager.cpp" />
     <ClCompile Include="JwtTokenUtil.cpp">
@@ -188,6 +190,9 @@
     <ClInclude Include="DatabaseConnectionPool.h" />
     <ClInclude Include="EncryptUtil.h" />
     <ClInclude Include="FilesController.h" />
+    <ClInclude Include="GroupResourceController.h" />
+    <ClInclude Include="GroupResourceDao.h" />
+    <ClInclude Include="GroupResourceModel.h" />
     <ClInclude Include="FileService.h" />
     <ClInclude Include="FriendController.h" />
     <ClInclude Include="FriendRelationDao.h" />
