@@ -36,6 +36,41 @@ bool GroupMsgReadDao::markRead(const GroupMsgReadModel &model)
     return false;
 }
 
+bool GroupMsgReadDao::markGroupReadThrough(const std::string& userId,
+                                           uint64_t groupId,
+                                           uint64_t maxMsgId,
+                                           uint64_t readTime) const
+{
+    if (userId.empty() || groupId == 0 || maxMsgId == 0)
+    {
+        return false;
+    }
+
+    try
+    {
+        auto con = Logger::GetInstance().createConnection();
+        std::unique_ptr<sql::PreparedStatement> pstmt(
+            con->prepareStatement(
+                "UPDATE groupMsgRead gr "
+                "JOIN groupMessage gm ON gm.msgId = gr.msgId "
+                "SET gr.readTime = ? "
+                "WHERE gr.userId = ? AND gm.groupId = ? "
+                "AND gm.msgId <= ? AND gr.readTime = 0"));
+        pstmt->setUInt64(1, readTime);
+        pstmt->setString(2, userId);
+        pstmt->setUInt64(3, groupId);
+        pstmt->setUInt64(4, maxMsgId);
+        pstmt->executeUpdate();
+        // 没有新未读记录同样表示目标状态已经达成。
+        return true;
+    }
+    catch (const std::exception& e)
+    {
+        Logger::GetInstance().error(e.what());
+    }
+    return false;
+}
+
 std::vector<GroupMsgReadModel> GroupMsgReadDao::getReadStatusesByMsg(uint64_t msgId) const
 {
     std::vector<GroupMsgReadModel> result;

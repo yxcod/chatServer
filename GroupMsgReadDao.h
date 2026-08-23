@@ -15,6 +15,12 @@ public:
     // 标记记录已读（利用唯一键 msgId+userId，更新 readTime）
     bool markRead(const GroupMsgReadModel& model);
 
+    // 将用户在指定群中、不晚于某条消息的所有未读记录一次性标记为已读。
+    bool markGroupReadThrough(const std::string& userId,
+                              uint64_t groupId,
+                              uint64_t maxMsgId,
+                              uint64_t readTime) const;
+
     // 查询某条消息所有已读用户
     std::vector<GroupMsgReadModel> getReadersByMsg(uint64_t msgId) const;
 

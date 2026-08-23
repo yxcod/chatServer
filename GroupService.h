@@ -32,4 +32,8 @@ public:
 	Json::Value handleGroupMessage(const Json::Value& jsonMsg);
 	//确认群消息为已读
 	std::string groupMessageRead(const Json::Value& jsonMsg);
+	//按消息水位批量确认群消息已读
+	Json::Value markGroupMessagesRead(const std::string& reader,
+	                                  uint64_t groupId,
+	                                  uint64_t readThroughMsgId);
 };

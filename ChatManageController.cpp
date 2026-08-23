@@ -24,6 +24,25 @@ std::string jsonString(const Json::Value& value)
     Json::StreamWriterBuilder builder;
     return Json::writeString(builder, value);
 }
+
+int jsonInt(const Json::Value& value)
+{
+    if (value.isInt() || value.isUInt() || value.isInt64() || value.isUInt64())
+    {
+        return value.asInt();
+    }
+    if (value.isString())
+    {
+        try
+        {
+            return std::stoi(value.asString());
+        }
+        catch (...)
+        {
+        }
+    }
+    return 0;
+}
 }
 
 ChatWSServer* ChatWSServer::GetInstance()
@@ -285,8 +304,8 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
 			GroupService groupService;
 		const std::string reader = jsonMsg["sender"].asString();
 		if (connectedUserName(conn) != reader) return;
-		const int groupId = jsonMsg.get(
-			"groupId", jsonMsg.get("sessionId", jsonMsg.get("receiveId", 0))).asInt();
+		const int groupId = jsonInt(jsonMsg.get(
+			"groupId", jsonMsg.get("sessionId", jsonMsg.get("receiveId", 0))));
 		const auto memberIds = groupService.getUserIds(groupId);
 		if (std::find(memberIds.begin(), memberIds.end(), reader) == memberIds.end()) return;
         //反馈给receiveId 他的消息已读
@@ -310,6 +329,54 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
 		}
         return;
 
+    }
+    // 用户进入群聊后按消息水位批量清除未读，并广播给在线群成员。
+    else if (msgType == "groupChatRead")
+    {
+		try
+		{
+			const std::string reader = jsonMsg["reader"].asString();
+			if (reader.empty() || connectedUserName(conn) != reader) return;
+			const int groupId = jsonInt(jsonMsg.get("groupId", jsonMsg["sessionId"]));
+			const uint64_t readThroughMsgId =
+				jsonMsg["readThroughMsgId"].asUInt64();
+			if (groupId <= 0 || readThroughMsgId == 0) return;
+
+			GroupService groupService;
+			const auto memberIds = groupService.getUserIds(groupId);
+			if (std::find(memberIds.begin(), memberIds.end(), reader) ==
+				memberIds.end()) return;
+
+			const Json::Value result = groupService.markGroupMessagesRead(
+				reader, static_cast<uint64_t>(groupId), readThroughMsgId);
+			const std::string forward = jsonString(result);
+			std::vector<WebSocketConnectionPtr> recipients;
+			{
+				std::lock_guard<std::mutex> lock(connMutex);
+				for (const auto& member : memberIds)
+				{
+					const auto it = onlineUsers.find(member);
+					if (it != onlineUsers.end() && it->second &&
+						it->second->connected())
+					{
+						recipients.push_back(it->second);
+					}
+				}
+			}
+			for (const auto& recipient : recipients)
+			{
+				recipient->send(forward);
+			}
+		}
+		catch (const std::exception& e)
+		{
+			Logger::GetInstance().error(std::string("groupChatRead failed: ") + e.what());
+		}
+		catch (...)
+		{
+			Logger::GetInstance().error("groupChatRead failed: unknown exception");
+		}
+		return;
     }
    
     

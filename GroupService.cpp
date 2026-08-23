@@ -716,3 +716,36 @@ std::string GroupService::groupMessageRead(const Json::Value& jsonMsg)
 	std::string forwardStr = Json::writeString(wbuilder, response);
 	return forwardStr;
 }
+
+Json::Value GroupService::markGroupMessagesRead(const std::string& reader,
+	                                             uint64_t groupId,
+	                                             uint64_t readThroughMsgId)
+{
+	Json::Value response;
+	response["type"] = "groupChatReadCallback";
+	response["code"] = 101;
+	response["status"] = "read";
+	response["reader"] = reader;
+	response["groupId"] = Json::UInt64(groupId);
+	response["sessionId"] = std::to_string(groupId);
+	response["readThroughMsgId"] = Json::UInt64(readThroughMsgId);
+
+	if (reader.empty() || groupId == 0 || readThroughMsgId == 0)
+	{
+		response["error"] = "invalid group read watermark";
+		return response;
+	}
+
+	const uint64_t readTime = Logger::GetInstance().getcurrentTime();
+	if (GroupMsgReadDao().markGroupReadThrough(
+		reader, groupId, readThroughMsgId, readTime))
+	{
+		response["code"] = 100;
+		response["readTime"] = Json::UInt64(readTime);
+	}
+	else
+	{
+		response["error"] = "failed to persist group read watermark";
+	}
+	return response;
+}
