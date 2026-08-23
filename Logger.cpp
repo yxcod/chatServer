@@ -1,5 +1,22 @@
 #include "Logger.h"
 
+#include <algorithm>
+#include <cctype>
+#include <filesystem>
+
+namespace
+{
+bool isSensitiveLogField(std::string field)
+{
+    std::transform(field.begin(), field.end(), field.begin(),
+                   [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+    return field.find("password") != std::string::npos ||
+           field.find("token") != std::string::npos ||
+           field.find("authorization") != std::string::npos ||
+           field.find("secret") != std::string::npos;
+}
+}
+
 Logger& Logger::GetInstance()
 {
     static Logger instance; // C++11+ 线程安全单例
@@ -55,7 +72,6 @@ void Logger::initMysSql()
 void Logger::initService()
 {
     // 运行服务器
-    drogon::app().setLogLevel(trantor::Logger::kDebug);
     try
     {
         drogon::app().addListener("0.0.0.0", 5555);
@@ -63,8 +79,8 @@ void Logger::initService()
     }
     catch (const std::exception& e)
     {
-        std::cerr << "addListener failed: " << e.what() << std::endl;
-        return;
+        error(std::string("addListener failed: ") + e.what());
+        throw;
     }
 
     auto& app = drogon::app();
@@ -88,6 +104,15 @@ void Logger::initService()
     drogon::app().run();
 }
 
+void Logger::initLogging(const std::string& logDirectory)
+{
+    std::filesystem::create_directories(logDirectory);
+    drogon::app()
+        .setLogPath(logDirectory, "chat-server", 20 * 1024 * 1024, 10, false)
+        .setLogLocalTime(true)
+        .setLogLevel(trantor::Logger::kDebug);
+}
+
 // 打印 json
 void Logger::debugJson(const Json::Value& j, const std::string& prefix)
 {
@@ -109,8 +134,10 @@ void Logger::debugJson(const Json::Value& j, const std::string& prefix)
     }
     else
     {
-        // 基础类型直接打印
-        std::cout << prefix << " = " << j.toStyledString();
+        // 避免将密码、令牌等敏感请求字段写入持久化日志。
+        LOG_DEBUG << prefix << " = "
+                  << (isSensitiveLogField(prefix) ? "[REDACTED]"
+                                                  : j.toStyledString());
     }
 }
 
@@ -125,7 +152,17 @@ uint64_t Logger::getcurrentTime() const
 
 void Logger::error(const std::string& msg)
 {
-    std::cout << "ERRO===" << " = " << msg;
+    LOG_ERROR << msg;
+}
+
+void Logger::info(const std::string& msg)
+{
+    LOG_INFO << msg;
+}
+
+void Logger::warning(const std::string& msg)
+{
+    LOG_WARN << msg;
 }
 
 std::string Logger::joinWithUnderscore(const std::vector<std::string>& items) const

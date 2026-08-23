@@ -164,6 +164,9 @@
     <ClInclude Include="GroupConversationDao.h">
       <Filter>源文件\Mapper</Filter>
     </ClInclude>
+    <ClInclude Include="CrashHandler.h">
+      <Filter>源文件\Tool</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="LoginDao.cpp">
@@ -229,6 +232,9 @@
       <Filter>源文件\Tool</Filter>
     </ClCompile>
     <ClCompile Include="Logger.cpp">
+      <Filter>源文件\Tool</Filter>
+    </ClCompile>
+    <ClCompile Include="CrashHandler.cpp">
       <Filter>源文件\Tool</Filter>
     </ClCompile>
     <ClCompile Include="DatabaseConnectionPool.cpp">

@@ -3,7 +3,7 @@
 #include "DatabaseConnectionPool.h"
 #include <iostream>
 #include <string>
-#include <ctime>  // ÓÃÓÚÊ±¼äÀàĞÍ£¨Êı¾İ¿â DATETIME ¶ÔÓ¦ C++ tm ½á¹¹Ìå£©
+#include <ctime>  // ç”¨äºæ—¶é—´ç±»å‹ï¼ˆæ•°æ®åº“ DATETIME å¯¹åº” C++ tm ç»“æ„ä½“ï¼‰
 #include <sstream>
 #include <iomanip>
 #include <drogon/HttpAppFramework.h>
@@ -23,15 +23,15 @@ using json = nlohmann::json;
 class Logger
 {
 public:
-    // ½ûÓÃ¿½±´¡¢¸³Öµ¡¢ÒÆ¶¯
+    // ç¦ç”¨æ‹·è´ã€èµ‹å€¼ã€ç§»åŠ¨
     Logger(const Logger&) = delete;
     Logger& operator=(const Logger&) = delete;
     Logger(Logger&&) = delete;
     Logger& operator=(Logger&&) = delete;
 
-    // »ñÈ¡µ¥ÀıÊµÀı£¨ÎŞ²Î£¬ÒòÎªÆô¶¯Ê±ÒÑ³õÊ¼»¯£©
+    // è·å–å•ä¾‹å®ä¾‹ï¼ˆæ— å‚ï¼Œå› ä¸ºå¯åŠ¨æ—¶å·²åˆå§‹åŒ–ï¼‰
     static Logger& GetInstance();
-    // ´ÓÁ¬½Ó³Ø½èÓÃÁ¬½Ó£»×âÔ¼Àë¿ª×÷ÓÃÓòÊ±×Ô¶¯¹é»¹¡£
+    // ä»è¿æ¥æ± å€Ÿç”¨è¿æ¥ï¼›ç§Ÿçº¦ç¦»å¼€ä½œç”¨åŸŸæ—¶è‡ªåŠ¨å½’è¿˜ã€‚
     PooledConnection createConnection() const;
 
     sql::ResultSet* executeSelectSql(const std::string& sql);
@@ -40,26 +40,31 @@ public:
     sql::Statement* getStatement() const;
     sql::Connection* getConnection() const;
 
-    // ³õÊ¼»¯Êı¾İ¿â
+    // åˆå§‹åŒ–æ•°æ®åº“
     void initMysSql();
 
-    // ³õÊ¼»¯·şÎñÆ÷
+    // åˆå§‹åŒ–æœåŠ¡å™¨
     void initService();
 
-    // ´òÓ¡ json
+    // åˆå§‹åŒ–æ–‡ä»¶æ—¥å¿—ï¼›å¿…é¡»åœ¨æ•°æ®åº“å’Œç½‘ç»œæœåŠ¡å¯åŠ¨å‰è°ƒç”¨ã€‚
+    void initLogging(const std::string& logDirectory);
+
+    // æ‰“å° json
     void debugJson(const Json::Value& j, const std::string& prefix = "");
 
-    // »ñÈ¡µ±Ç°Ê±¼ä´Á
+    // è·å–å½“å‰æ—¶é—´æˆ³
     uint64_t getcurrentTime() const;
-    //´íÎóÈÕÖ¾½Ó¿Ú£¨Ö§³Ö std::string / C ×Ö·û´®£©
+    //é”™è¯¯æ—¥å¿—æ¥å£ï¼ˆæ”¯æŒ std::string / C å­—ç¬¦ä¸²ï¼‰
     void error(const std::string& msg);
-    // ½«×Ö·û´®Êı×éÆ´½Ó³É "s1_s2_s3" ĞÎÊ½
+    void info(const std::string& msg);
+    void warning(const std::string& msg);
+    // å°†å­—ç¬¦ä¸²æ•°ç»„æ‹¼æ¥æˆ "s1_s2_s3" å½¢å¼
     std::string joinWithUnderscore(const std::vector<std::string>& items) const;
 
-    // ´Ó "s1_s2_s3" ÖĞÒÆ³ıÖ¸¶¨×Ó´®£¨ÈçÒÆ³ı "s2" -> "s1_s3"£©
-    // Èô¸ñÊ½²»·ûºÏ»ò²»°üº¬¸Ã×Ó´®£¬Ôò·µ»ØÔ­×Ö·û´®
+    // ä» "s1_s2_s3" ä¸­ç§»é™¤æŒ‡å®šå­ä¸²ï¼ˆå¦‚ç§»é™¤ "s2" -> "s1_s3"ï¼‰
+    // è‹¥æ ¼å¼ä¸ç¬¦åˆæˆ–ä¸åŒ…å«è¯¥å­ä¸²ï¼Œåˆ™è¿”å›åŸå­—ç¬¦ä¸²
     std::string removeFromJoined(const std::string& joined, const std::string& toRemove) const;
-    //´´½¨Ä¿Â¼
+    //åˆ›å»ºç›®å½•
     void createDataDirectories(const std::string& name) const;
    
 private:

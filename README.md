@@ -27,3 +27,19 @@ See `.env.example` for local development placeholders. Never commit real credent
 Open `ChatServer.sln` with Visual Studio 2022 and build the x64 configuration. The project currently expects Boost 1.86 at `C:\boost_1_86_0`.
 
 By default, the HTTP/WebSocket service listens on port `5555`.
+
+# Logging and crash reports
+
+ChatServer writes rotating runtime logs to `logs/` next to `ChatServer.exe`.
+Each runtime log is limited to 20 MB and the latest 10 files are retained.
+
+Unhandled Windows exceptions, fatal signals, and uncaught C++ exceptions create
+files in `logs/crashes/`:
+
+- `crash-<time>-p<process>-t<thread>.log`: exception details and stack trace.
+- `crash-<time>-p<process>-t<thread>.dmp`: Windows minidump for Visual Studio or WinDbg.
+
+Keep the matching `.pdb` file beside the deployed executable. When reporting a
+crash, first provide the crash `.log` and the latest `chat-server` runtime log.
+If the text stack is incomplete, also provide the matching `.dmp`, `.pdb`, and
+the Git commit ID.

@@ -12,6 +12,7 @@ Release/
 *.ipdb
 *.tlog
 *.log
+*.dmp
 *.exe
 *.dll
 *.user
@@ -22,6 +23,7 @@ imageData/
 ImageData/
 videoData/
 fileData/
+logs/
 
 # Local configuration and secrets
 .env
