@@ -38,6 +38,12 @@ public:
 	// 删除指定会话（sessionId）下的所有聊天记录，返回受影响行数
 	int deleteChatRecordsBetweenUsers(const std::string& sessionId) const;
 
+	// 原子删除私聊会话及其全部消息。仅当请求者和对方确为会话参与者时执行。
+	// 1=成功（包含重复删除），-1=无权限或会话参与者不匹配，0=数据库错误。
+	int deletePrivateChatHistory(const std::string& sessionId,
+		const std::string& requesterId,
+		const std::string& peerId) const;
+
 	// 根据会话ID sessionId 查询 chatrecord 表中的所有聊天记录
 	std::vector<ChatRecord> getChatRecordsBySessionId(const std::string& sessionId) const;
 

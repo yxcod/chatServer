@@ -22,6 +22,8 @@ public:
 	Json::Value getunReadMessage(const Json::Value& jsonMsg);
 	//获取指定会话的最近聊天记录
 	Json::Value getRecentChatRecords(const Json::Value& jsonMsg);
+	//删除私聊会话及其全部聊天记录
+	Json::Value deletePrivateChatHistory(const Json::Value& jsonMsg);
 	//处理视频通话请求
 	std::string handleVideoCallRequest(const Json::Value& jsonMsg);
 	//处理视频通话同意请求

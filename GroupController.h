@@ -20,6 +20,7 @@ public:
 		ADD_METHOD_TO(GroupController::updateGroupMemberInfo, "/api/group/updateGroupMemberInfo", Post);
 		ADD_METHOD_TO(GroupController::updateGroupInfo, "/api/group/updateGroupInfo", Post);
 		ADD_METHOD_TO(GroupController::getGroupConversations, "/api/group/groupConversation", Post);
+		ADD_METHOD_TO(GroupController::deleteGroupChatHistory, "/api/group/deleteGroupChatHistory", Post);
 	
 	
 	METHOD_LIST_END
@@ -97,6 +98,33 @@ public:
 			response_data["msg"] = "internal server error";
 			callback(HttpResponse::newHttpJsonResponse(response_data));
 		}
+	}
+	// 群主删除全群聊天记录
+	void deleteGroupChatHistory(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback)
+	{
+		auto json = req->getJsonObject();
+		Json::Value response_data;
+		if (!json || !json->isMember("groupId") || !json->isMember("userName"))
+		{
+			response_data["code"] = 99;
+			response_data["msg"] = "invalid request body";
+			callback(HttpResponse::newHttpJsonResponse(response_data));
+			return;
+		}
+		const auto authenticatedUser = getAuthenticatedUser(req);
+		if (!authenticatedUser || *authenticatedUser != (*json)["userName"].asString())
+		{
+			response_data["code"] = 401;
+			response_data["msg"] = "unauthorized";
+			auto response = HttpResponse::newHttpJsonResponse(response_data);
+			response->setStatusCode(k401Unauthorized);
+			callback(response);
+			return;
+		}
+		Logger::GetInstance().debugJson(*json);
+		GroupService groupService;
+		callback(HttpResponse::newHttpJsonResponse(
+			groupService.deleteGroupChatHistory(*json)));
 	}
 	//获取群的会话列表
 	void getGroupConversations(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback)
@@ -188,5 +216,17 @@ public:
 		GroupService groupService;
 		callback(HttpResponse::newHttpJsonResponse(groupService.updateGroupInfo(*json)));
 	}
-	
+
+private:
+	static std::optional<std::string> getAuthenticatedUser(const HttpRequestPtr& req)
+	{
+		static JwtTokenUtil tokenUtil(
+			"c9bb708f526d420ea88d83cd316d662921646869efaf425eb150ab99d20f48bc");
+		auto token = tokenUtil.extractBearerToken(req);
+		if (!token || !tokenUtil.verifyToken(*token)) return std::nullopt;
+		const auto payload = tokenUtil.parsePayload(*token);
+		const auto user = payload.find("userId");
+		if (user == payload.end() || user->second.empty()) return std::nullopt;
+		return user->second;
+	}
 };

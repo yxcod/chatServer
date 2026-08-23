@@ -36,6 +36,37 @@ Json::Value GroupService::getAllGroups(const Json::Value& groupInfo)
     
 }
 
+Json::Value GroupService::deleteGroupChatHistory(const Json::Value& groupInfo)
+{
+	Json::Value response;
+	response["code"] = 101;
+	const uint64_t groupId = groupInfo["groupId"].asUInt64();
+	const std::string userName = groupInfo["userName"].asString();
+	if (groupId == 0 || userName.empty())
+	{
+		response["code"] = 99;
+		response["msg"] = "invalid request body";
+		return response;
+	}
+
+	GroupMessageDao dao;
+	const int status = dao.deleteGroupChatHistory(groupId, userName);
+	if (status == 1)
+	{
+		response["code"] = 100;
+	}
+	else if (status == -1)
+	{
+		response["code"] = 103;
+		response["msg"] = "only the group owner can delete group history";
+	}
+	else
+	{
+		response["msg"] = "failed to delete group chat history";
+	}
+	return response;
+}
+
 Json::Value GroupService::getGroupMembers(const Json::Value& groupInfo)
 {
 	Json::Value response;

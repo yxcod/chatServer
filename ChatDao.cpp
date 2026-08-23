@@ -68,6 +68,76 @@ int ChatDao::deleteConversationByConvId(const std::string& convId) const
     }
 }
 
+int ChatDao::deletePrivateChatHistory(
+    const std::string& sessionId,
+    const std::string& requesterId,
+    const std::string& peerId) const
+{
+    if (sessionId.empty() || requesterId.empty() || peerId.empty() ||
+        requesterId == peerId)
+    {
+        return -1;
+    }
+
+    auto con = Logger::GetInstance().createConnection();
+    try
+    {
+        con->setAutoCommit(false);
+        std::unique_ptr<sql::PreparedStatement> verifyStmt(con->prepareStatement(
+            "SELECT user1Id, user2Id FROM conversations "
+            "WHERE convId = ? FOR UPDATE"));
+        verifyStmt->setString(1, sessionId);
+        std::unique_ptr<sql::ResultSet> verifyResult(verifyStmt->executeQuery());
+        if (verifyResult->next())
+        {
+            const std::string user1Id = verifyResult->getString("user1Id");
+            const std::string user2Id = verifyResult->getString("user2Id");
+            const bool participantsMatch =
+                (user1Id == requesterId && user2Id == peerId) ||
+                (user1Id == peerId && user2Id == requesterId);
+            if (!participantsMatch)
+            {
+                con->rollback();
+                con->setAutoCommit(true);
+                return -1;
+            }
+        }
+        else
+        {
+            // 会话已删除时按幂等成功处理，避免重复操作报错。
+            con->rollback();
+            con->setAutoCommit(true);
+            return 1;
+        }
+
+        std::unique_ptr<sql::PreparedStatement> recordsStmt(con->prepareStatement(
+            "DELETE FROM chatrecord WHERE sessionId = ?"));
+        recordsStmt->setString(1, sessionId);
+        recordsStmt->executeUpdate();
+
+        std::unique_ptr<sql::PreparedStatement> conversationStmt(con->prepareStatement(
+            "DELETE FROM conversations WHERE convId = ?"));
+        conversationStmt->setString(1, sessionId);
+        conversationStmt->executeUpdate();
+
+        con->commit();
+        con->setAutoCommit(true);
+        return 1;
+    }
+    catch (const std::exception& e)
+    {
+        try
+        {
+            con->rollback();
+            con->setAutoCommit(true);
+        }
+        catch (...) {}
+        Logger::GetInstance().error(
+            std::string("deletePrivateChatHistory failed: ") + e.what());
+        return 0;
+    }
+}
+
 int ChatDao::updateConversation(const ConversationModel& conversation) const
 {
     std::string sql =

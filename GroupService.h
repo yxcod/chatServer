@@ -36,4 +36,6 @@ public:
 	Json::Value markGroupMessagesRead(const std::string& reader,
 	                                  uint64_t groupId,
 	                                  uint64_t readThroughMsgId);
+	//群主删除群聊全部聊天记录
+	Json::Value deleteGroupChatHistory(const Json::Value& groupInfo);
 };

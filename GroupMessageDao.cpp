@@ -350,3 +350,60 @@ bool GroupMessageDao::deleteMessagesByGroupId(uint64_t groupId)
     }
     return false;
 }
+
+int GroupMessageDao::deleteGroupChatHistory(
+    uint64_t groupId,
+    const std::string& requesterId)
+{
+    if (groupId == 0 || requesterId.empty()) return -1;
+
+    auto con = Logger::GetInstance().createConnection();
+    try
+    {
+        con->setAutoCommit(false);
+        std::unique_ptr<sql::PreparedStatement> ownerStmt(con->prepareStatement(
+            "SELECT role FROM groupMember "
+            "WHERE groupId = ? AND userId = ? AND isQuit = 0 FOR UPDATE"));
+        ownerStmt->setUInt64(1, groupId);
+        ownerStmt->setString(2, requesterId);
+        std::unique_ptr<sql::ResultSet> ownerResult(ownerStmt->executeQuery());
+        if (!ownerResult->next() || ownerResult->getUInt("role") != 2)
+        {
+            con->rollback();
+            con->setAutoCommit(true);
+            return -1;
+        }
+
+        std::unique_ptr<sql::PreparedStatement> readsStmt(con->prepareStatement(
+            "DELETE FROM groupMsgRead WHERE msgId IN "
+            "(SELECT msgId FROM groupMessage WHERE groupId = ?)"));
+        readsStmt->setUInt64(1, groupId);
+        readsStmt->executeUpdate();
+
+        std::unique_ptr<sql::PreparedStatement> messagesStmt(con->prepareStatement(
+            "DELETE FROM groupMessage WHERE groupId = ?"));
+        messagesStmt->setUInt64(1, groupId);
+        messagesStmt->executeUpdate();
+
+        std::unique_ptr<sql::PreparedStatement> conversationStmt(con->prepareStatement(
+            "DELETE FROM groupConversations WHERE groupId = ?"));
+        conversationStmt->setUInt64(1, groupId);
+        conversationStmt->executeUpdate();
+
+        con->commit();
+        con->setAutoCommit(true);
+        return 1;
+    }
+    catch (const std::exception& e)
+    {
+        try
+        {
+            con->rollback();
+            con->setAutoCommit(true);
+        }
+        catch (...) {}
+        Logger::GetInstance().error(
+            std::string("deleteGroupChatHistory failed: ") + e.what());
+        return 0;
+    }
+}

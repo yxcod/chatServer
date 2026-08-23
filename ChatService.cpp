@@ -308,6 +308,39 @@ Json::Value ChatService::getRecentChatRecords(const Json::Value& jsonMsg)
     return result;
 }
 
+Json::Value ChatService::deletePrivateChatHistory(const Json::Value& jsonMsg)
+{
+    Json::Value result;
+    result["code"] = 101;
+    const std::string userName = jsonMsg["userName"].asString();
+    const std::string peerUserName = jsonMsg["peerUserName"].asString();
+    const std::string conversationId = jsonMsg["conversationId"].asString();
+    if (userName.empty() || peerUserName.empty() || conversationId.empty())
+    {
+        result["code"] = 99;
+        result["msg"] = "invalid request body";
+        return result;
+    }
+
+    ChatDao dao;
+    const int status = dao.deletePrivateChatHistory(
+        conversationId, userName, peerUserName);
+    if (status == 1)
+    {
+        result["code"] = 100;
+    }
+    else if (status == -1)
+    {
+        result["code"] = 103;
+        result["msg"] = "conversation permission denied";
+    }
+    else
+    {
+        result["msg"] = "failed to delete chat history";
+    }
+    return result;
+}
+
 std::string ChatService::handleVideoCallRequest(const Json::Value& jsonMsg)
 {
    

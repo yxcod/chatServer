@@ -33,5 +33,8 @@ public:
     int getUnreadCountByUserAndGroup(const std::string &userId, uint64_t groupId) const;
     // 根据 groupId 删除该群所有消息及其对应的已读记录
     bool deleteMessagesByGroupId(uint64_t groupId);
+    // 群主原子删除全群消息、阅读状态和群会话摘要。
+    // 1=成功，-1=不是群主，0=数据库错误。
+    int deleteGroupChatHistory(uint64_t groupId, const std::string& requesterId);
 private:
 };
