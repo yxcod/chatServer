@@ -14,6 +14,8 @@ namespace api {
 		ADD_METHOD_TO(FilesController::upLoadImage, "/api/image/upload", Post);
 		ADD_METHOD_TO(FilesController::loadVideo, "/api/video/download", Get);
 		ADD_METHOD_TO(FilesController::upLoadVideo, "/api/video/upload", Post);
+		ADD_METHOD_TO(FilesController::loadAudio, "/api/audio/download", Get);
+		ADD_METHOD_TO(FilesController::upLoadAudio, "/api/audio/upload", Post);
 		METHOD_LIST_END
 		//文件下载
 		void downloadFile(const HttpRequestPtr& req,
@@ -33,6 +35,12 @@ namespace api {
 		void loadVideo(const HttpRequestPtr& req,
 			std::function<void(const HttpResponsePtr&)>&& callback);
 		void upLoadVideo(const HttpRequestPtr& req,
+			std::function<void(const HttpResponsePtr&)>&& callback);
+
+		// 聊天语音上传和支持 HTTP Range 的在线播放。
+		void loadAudio(const HttpRequestPtr& req,
+			std::function<void(const HttpResponsePtr&)>&& callback);
+		void upLoadAudio(const HttpRequestPtr& req,
 			std::function<void(const HttpResponsePtr&)>&& callback);
 	};
 
