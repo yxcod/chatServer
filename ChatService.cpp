@@ -1,5 +1,21 @@
 #include"ChatService.h"
 #include"ChatDao.h"
+
+namespace
+{
+int toClientMessageType(int serverType)
+{
+    // Dart MessageType: text=0, image=1, video=2, audio=3...
+    switch (serverType)
+    {
+    case 1: return 0;
+    case 2: return 1;
+    case 4: return 2;
+    case 3: return 3;
+    default: return serverType > 0 ? static_cast<int>(serverType) - 1 : 0;
+    }
+}
+}
 #include <json/json.h>
 #include "ChatRecoedModel.h"
 #include"ChatDao.h"
@@ -269,7 +285,7 @@ Json::Value ChatService::getunReadMessage(const Json::Value& jsonMsg)
         item["timestamp"] = c.getSendTime();
         item["msgId"] = c.getMsgId();
         item["content"] = c.getMsgContent();
-        item["messageType"] = (int)c.getMsgType() - 1;
+        item["messageType"] = toClientMessageType(static_cast<int>(c.getMsgType()));
         item["messageStatus"] = (int)c.getMsgStatus();
         item["conversationId"] = c.getSessionId();
 
@@ -295,7 +311,7 @@ Json::Value ChatService::getRecentChatRecords(const Json::Value& jsonMsg)
         item["timestamp"] = c.getSendTime();
         item["msgId"] = c.getMsgId();
         item["content"] = c.getMsgContent();
-        item["messageType"] = (int)c.getMsgType() - 1;
+        item["messageType"] = toClientMessageType(static_cast<int>(c.getMsgType()));
         item["messageStatus"] = (int)c.getMsgStatus();
         item["conversationId"] = c.getSessionId();
 
