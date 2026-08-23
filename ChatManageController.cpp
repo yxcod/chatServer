@@ -67,6 +67,39 @@ void ChatWSServer::closeConnectionByUser(const std::string& userName)
     broadcastPresence(userName, false);
 }
 
+void ChatWSServer::notifyGroupHistoryDeleted(
+    const std::vector<std::string>& memberIds,
+    uint64_t groupId,
+    const std::string& operatorId)
+{
+    Json::Value event;
+    event["type"] = "groupChatHistoryDeleted";
+    event["groupId"] = Json::UInt64(groupId);
+    event["operatorId"] = operatorId;
+    event["deletedAt"] = Json::UInt64(Logger::GetInstance().getcurrentTime());
+    event["message"] = "群主已删除当前群聊的全部聊天记录";
+    const std::string payload = jsonString(event);
+
+    std::vector<WebSocketConnectionPtr> recipients;
+    {
+        std::lock_guard<std::mutex> lock(connMutex);
+        for (const auto& memberId : memberIds)
+        {
+            // 发起删除的群主由 HTTP 页面流程负责清理和退出，避免重复处理。
+            if (memberId == operatorId) continue;
+            const auto it = onlineUsers.find(memberId);
+            if (it != onlineUsers.end() && it->second && it->second->connected())
+            {
+                recipients.push_back(it->second);
+            }
+        }
+    }
+    for (const auto& recipient : recipients)
+    {
+        recipient->send(payload);
+    }
+}
+
 void ChatWSServer::handleNewConnection(const HttpRequestPtr& req,
     const WebSocketConnectionPtr& conn)
 {

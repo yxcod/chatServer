@@ -4,6 +4,7 @@
 #include <drogon/WebSocketController.h>
 #include <unordered_map>
 #include <mutex>
+#include <vector>
 #include <json/json.h>
 #include "ChatService.h"
 #include "JwtTokenUtil.h"
@@ -28,6 +29,12 @@ public:
 
     // 按用户关闭 WebSocket 连接
     void closeConnectionByUser(const std::string& userName);
+
+    // 通知在线群成员：群主已删除该群全部聊天记录。
+    static void notifyGroupHistoryDeleted(
+        const std::vector<std::string>& memberIds,
+        uint64_t groupId,
+        const std::string& operatorId);
 
     // WebSocketController 接口实现
     void handleNewConnection(const HttpRequestPtr& req,

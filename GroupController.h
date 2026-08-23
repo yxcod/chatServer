@@ -5,6 +5,7 @@
 #include "Logger.h"
 #include "JwtTokenUtil.h"
 #include "GroupService.h"
+#include "ChatManageController.h"
 using namespace drogon;
 using namespace drogon::orm;
 
@@ -123,8 +124,16 @@ public:
 		}
 		Logger::GetInstance().debugJson(*json);
 		GroupService groupService;
-		callback(HttpResponse::newHttpJsonResponse(
-			groupService.deleteGroupChatHistory(*json)));
+		const auto memberIds = groupService.getUserIds((*json)["groupId"].asInt());
+		const Json::Value result = groupService.deleteGroupChatHistory(*json);
+		if (result["code"].asInt() == 100)
+		{
+			ChatWSServer::notifyGroupHistoryDeleted(
+				memberIds,
+				(*json)["groupId"].asUInt64(),
+				(*json)["userName"].asString());
+		}
+		callback(HttpResponse::newHttpJsonResponse(result));
 	}
 	//获取群的会话列表
 	void getGroupConversations(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback)
