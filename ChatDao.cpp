@@ -104,10 +104,26 @@ int ChatDao::deletePrivateChatHistory(
         }
         else
         {
-            // 会话已删除时按幂等成功处理，避免重复操作报错。
-            con->rollback();
-            con->setAutoCommit(true);
-            return 1;
+            // 兼容旧逻辑留下的孤立消息：逐条确认仍只属于这两个参与者。
+            std::unique_ptr<sql::PreparedStatement> orphanStmt(con->prepareStatement(
+                "SELECT COUNT(*) AS totalCount, "
+                "SUM(CASE WHEN (sendUserId = ? AND receiveId = ?) OR "
+                "(sendUserId = ? AND receiveId = ?) THEN 1 ELSE 0 END) AS matchCount "
+                "FROM chatrecord WHERE sessionId = ?"));
+            orphanStmt->setString(1, requesterId);
+            orphanStmt->setString(2, peerId);
+            orphanStmt->setString(3, peerId);
+            orphanStmt->setString(4, requesterId);
+            orphanStmt->setString(5, sessionId);
+            std::unique_ptr<sql::ResultSet> orphanResult(orphanStmt->executeQuery());
+            if (!orphanResult->next() ||
+                orphanResult->getUInt64("totalCount") !=
+                    orphanResult->getUInt64("matchCount"))
+            {
+                con->rollback();
+                con->setAutoCommit(true);
+                return -1;
+            }
         }
 
         std::unique_ptr<sql::PreparedStatement> recordsStmt(con->prepareStatement(
