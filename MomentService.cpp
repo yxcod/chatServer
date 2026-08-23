@@ -33,6 +33,14 @@ std::string trim(const std::string& value)
     return begin >= end ? std::string() : std::string(begin, end);
 }
 
+std::string toLower(std::string value)
+{
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    return value;
+}
+
 std::uint64_t readUInt64(const Json::Value& value)
 {
     if (value.isUInt64()) return value.asUInt64();
@@ -163,7 +171,12 @@ Json::Value MomentService::publish(const std::string& userName,
                 return response(101, "Invalid media URL");
             }
             MomentMediaModel item;
-            item.setMediaType(0);
+            const std::string lowerUrl = toLower(url);
+            const bool isVideo = lowerUrl.find("/api/video/download") != std::string::npos ||
+                lowerUrl.find(".mp4") != std::string::npos ||
+                lowerUrl.find(".mov") != std::string::npos ||
+                lowerUrl.find(".m4v") != std::string::npos;
+            item.setMediaType(isVideo ? 1 : 0);
             item.setMediaUrl(url);
             item.setSortOrder(sortOrder++);
             media.push_back(std::move(item));

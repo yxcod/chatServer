@@ -87,13 +87,14 @@ MomentModel MomentDao::createMoment(
                 connection->prepareStatement(
                     "INSERT INTO momentMedia "
                     "(momentId, mediaType, mediaUrl, sortOrder, createdAt) "
-                    "VALUES (?, 0, ?, ?, ?)"));
+                    "VALUES (?, ?, ?, ?, ?)"));
             for (const auto& mediaItem : media)
             {
                 mediaStatement->setUInt64(1, momentId);
-                mediaStatement->setString(2, mediaItem.getMediaUrl());
-                mediaStatement->setUInt(3, mediaItem.getSortOrder());
-                mediaStatement->setUInt64(4, mediaItem.getCreatedAt());
+                mediaStatement->setUInt(2, mediaItem.getMediaType());
+                mediaStatement->setString(3, mediaItem.getMediaUrl());
+                mediaStatement->setUInt(4, mediaItem.getSortOrder());
+                mediaStatement->setUInt64(5, mediaItem.getCreatedAt());
                 mediaStatement->executeUpdate();
             }
         }
