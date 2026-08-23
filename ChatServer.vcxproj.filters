@@ -167,6 +167,9 @@
     <ClInclude Include="GroupResourceController.h"><Filter>源文件\Control</Filter></ClInclude>
     <ClInclude Include="GroupResourceDao.h"><Filter>源文件\Mapper</Filter></ClInclude>
     <ClInclude Include="GroupResourceModel.h"><Filter>源文件\Model</Filter></ClInclude>
+    <ClInclude Include="UserLocationController.h"><Filter>源文件\Control</Filter></ClInclude>
+    <ClInclude Include="UserLocationDao.h"><Filter>源文件\Mapper</Filter></ClInclude>
+    <ClInclude Include="UserLocationModel.h"><Filter>源文件\Model</Filter></ClInclude>
     <ClInclude Include="CrashHandler.h">
       <Filter>源文件\Tool</Filter>
     </ClInclude>
@@ -194,6 +197,8 @@
     <ClCompile Include="MomentService.cpp" />
     <ClCompile Include="GroupResourceController.cpp"><Filter>源文件\Control</Filter></ClCompile>
     <ClCompile Include="GroupResourceDao.cpp"><Filter>源文件\Mapper</Filter></ClCompile>
+    <ClCompile Include="UserLocationController.cpp"><Filter>源文件\Control</Filter></ClCompile>
+    <ClCompile Include="UserLocationDao.cpp"><Filter>源文件\Mapper</Filter></ClCompile>
     <ClCompile Include="UserLoginService.cpp">
       <Filter>源文件\Service</Filter>
     </ClCompile>

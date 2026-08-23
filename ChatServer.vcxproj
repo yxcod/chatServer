@@ -178,6 +178,8 @@
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <ClCompile Include="UserModel.cpp" />
+    <ClCompile Include="UserLocationController.cpp" />
+    <ClCompile Include="UserLocationDao.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ChatControl.h" />
@@ -190,6 +192,9 @@
     <ClInclude Include="DatabaseConnectionPool.h" />
     <ClInclude Include="EncryptUtil.h" />
     <ClInclude Include="FilesController.h" />
+    <ClInclude Include="UserLocationController.h" />
+    <ClInclude Include="UserLocationDao.h" />
+    <ClInclude Include="UserLocationModel.h" />
     <ClInclude Include="GroupResourceController.h" />
     <ClInclude Include="GroupResourceDao.h" />
     <ClInclude Include="GroupResourceModel.h" />

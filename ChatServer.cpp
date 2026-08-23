@@ -10,6 +10,7 @@
 #include"GroupController.h"
 #include "MomentController.h"
 #include "GroupResourceController.h"
+#include "UserLocationController.h"
 #include <cstdlib>
 using namespace drogon;
 
