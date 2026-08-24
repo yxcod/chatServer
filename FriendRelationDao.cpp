@@ -34,6 +34,7 @@ void FriendRelationDao::getAllFriendWithUserId(const std::string& userId, const 
             userInfo.setNickName(res->getString("nickName"));
             userInfo.setAvatar(res->getString("avatar"));
             userInfo.setGender(res->getUInt("gender"));
+            userInfo.setRegion(res->getString("region"));
             userInfo.setSignature(res->getString("signature"));
             userInfo.setCreateTime(res->getUInt64("createTime"));
             userInfo.setState(res->getUInt("state"));
@@ -42,7 +43,7 @@ void FriendRelationDao::getAllFriendWithUserId(const std::string& userId, const 
     }
     catch (...)
     {
-        // ³ö´íÊ±Ö±½Ó·µ»Øµ±Ç°ÒÑÊÕ¼¯µÄÊı¾İ
+        // å‡ºé”™æ—¶ç›´æ¥è¿”å›å½“å‰å·²æ”¶é›†çš„æ•°æ®
     }
 
     userInfoList = std::move(userInfoVector);
@@ -53,7 +54,7 @@ int FriendRelationDao::insertFriendApply(const FriendRelation& friendRelation) c
 {
     auto con = Logger::GetInstance().createConnection();
 
-    // ÏÈÅĞ¶ÏÊÇ·ñÒÑ´æÔÚÕâÁ½¸öÓÃ»§µÄºÃÓÑ¹ØÏµ
+    // å…ˆåˆ¤æ–­æ˜¯å¦å·²å­˜åœ¨è¿™ä¸¤ä¸ªç”¨æˆ·çš„å¥½å‹å…³ç³»
     std::string selectSql =
         "SELECT id FROM friendrelation "
         "WHERE (fromUserId = ? AND toUserId = ?) "
@@ -71,7 +72,7 @@ int FriendRelationDao::insertFriendApply(const FriendRelation& friendRelation) c
         res.reset(checkStmt->executeQuery());
         if (res->next())
         {
-            // ÒÑ´æÔÚ¼ÇÂ¼£ºÖ»¸üĞÂ status = 0 ºÍ updateTime
+            // å·²å­˜åœ¨è®°å½•ï¼šåªæ›´æ–° status = 0 å’Œ updateTime
             int relationId = res->getInt("id");
             res.reset();
 
@@ -79,7 +80,7 @@ int FriendRelationDao::insertFriendApply(const FriendRelation& friendRelation) c
                 "UPDATE friendrelation SET status = ?, updateTime = ? WHERE id = ?";
             std::unique_ptr<sql::PreparedStatement> updateStmt(
                 con->prepareStatement(updateSql));
-            updateStmt->setInt(1, 0); // 0 = ´ıÑéÖ¤
+            updateStmt->setInt(1, 0); // 0 = å¾…éªŒè¯
             updateStmt->setUInt64(2, Logger::GetInstance().getcurrentTime());
             updateStmt->setInt(3, relationId);
             return updateStmt->executeUpdate();
@@ -90,7 +91,7 @@ int FriendRelationDao::insertFriendApply(const FriendRelation& friendRelation) c
         return 0;
     }
 
-    // ²»´æÔÚ¼ÇÂ¼£ºÖ´ĞĞ²åÈë
+    // ä¸å­˜åœ¨è®°å½•ï¼šæ‰§è¡Œæ’å…¥
     std::string insertSql =
         "INSERT INTO friendrelation "
         "(fromUserId, toUserId, status, fromRemark, toRemark, source, applyMsg, createTime, updateTime) "
@@ -154,8 +155,8 @@ int FriendRelationDao::deleteFriendRelation(const std::string& userId1, const st
     {
         std::unique_ptr<sql::PreparedStatement> pstmt(
             con->prepareStatement(updateSql));
-        pstmt->setInt(1, 5);      // status = 5 É¾³ı
-        pstmt->setUInt64(2, now); // ¸üĞÂÊ±¼ä
+        pstmt->setInt(1, 5);      // status = 5 åˆ é™¤
+        pstmt->setUInt64(2, now); // æ›´æ–°æ—¶é—´
         pstmt->setString(3, userId1);
         pstmt->setString(4, userId2);
         pstmt->setString(5, userId2);
@@ -276,12 +277,12 @@ std::string FriendRelationDao::getFriendRemark(const std::string& userId1, const
     {
         std::unique_ptr<sql::PreparedStatement> pstmt(
             con->prepareStatement(selectSql));
-        // CASE ²¿·Ö²ÎÊı
+        // CASE éƒ¨åˆ†å‚æ•°
         pstmt->setString(1, userId1);
         pstmt->setString(2, userId2);
         pstmt->setString(3, userId2);
         pstmt->setString(4, userId1);
-        // WHERE ²¿·Ö²ÎÊı
+        // WHERE éƒ¨åˆ†å‚æ•°
         pstmt->setString(5, userId1);
         pstmt->setString(6, userId2);
         pstmt->setString(7, userId2);

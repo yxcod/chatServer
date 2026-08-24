@@ -1,0 +1,2 @@
+ALTER TABLE `userinfo`
+  ADD COLUMN `region` VARCHAR(100) NOT NULL DEFAULT '' AFTER `gender`;

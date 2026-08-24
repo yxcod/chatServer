@@ -2,75 +2,78 @@
 #define USER_INFO_H
 
 #include <string>
-#include <ctime>  // ÓÃÓÚÊ±¼äÀàĞÍ£¨Êı¾İ¿â DATETIME ¶ÔÓ¦ C++ tm ½á¹¹Ìå£©
+#include <ctime>  // ç”¨äºæ—¶é—´ç±»å‹ï¼ˆæ•°æ®åº“ DATETIME å¯¹åº” C++ tm ç»“æ„ä½“ï¼‰
 #include <sstream>
 #include <iomanip>
 
 /**
- * ÓÃ»§ĞÅÏ¢Ä£ĞÍ£¨¶ÔÓ¦ MySQL userinfo ±í£©
- * ×Ö¶ÎÓ³Éä£º
- * userId      ¡ú BIGINT UNSIGNED ¡ú uint64
- * userName    ¡ú VARCHAR(50)     ¡ú std::string
- * nickName    ¡ú VARCHAR(50)     ¡ú std::string
- * avatar      ¡ú VARCHAR(255)    ¡ú std::string
- * gender      ¡ú TINYINT         ¡ú uint8_t£¨0=Î´Öª£¬1=ÄĞ£¬2=Å®£¬ÎŞ·ûºÅ8Î»ÕûÊı£©
- * signature   ¡ú VARCHAR(200)    ¡ú std::string
- * createTime  ¡ú bigint unsigned        ¡ú std::tm£¨C++ ±ê×¼Ê±¼ä½á¹¹Ìå£¬¼æÈİÈÕÆÚÊ±¼ä¸ñÊ½£©
+ * ç”¨æˆ·ä¿¡æ¯æ¨¡å‹ï¼ˆå¯¹åº” MySQL userinfo è¡¨ï¼‰
+ * å­—æ®µæ˜ å°„ï¼š
+ * userId      â†’ BIGINT UNSIGNED â†’ uint64
+ * userName    â†’ VARCHAR(50)     â†’ std::string
+ * nickName    â†’ VARCHAR(50)     â†’ std::string
+ * avatar      â†’ VARCHAR(255)    â†’ std::string
+ * gender      â†’ TINYINT         â†’ uint8_tï¼ˆ0=æœªçŸ¥ï¼Œ1=ç”·ï¼Œ2=å¥³ï¼Œæ— ç¬¦å·8ä½æ•´æ•°ï¼‰
+ * signature   â†’ VARCHAR(200)    â†’ std::string
+ * createTime  â†’ bigint unsigned        â†’ std::tmï¼ˆC++ æ ‡å‡†æ—¶é—´ç»“æ„ä½“ï¼Œå…¼å®¹æ—¥æœŸæ—¶é—´æ ¼å¼ï¼‰
  */
 class UserInfo {
 public:
-    // 1. Ä¬ÈÏ¹¹Ôìº¯Êı£¨³õÊ¼»¯Ä¬ÈÏÖµ£©
+    // 1. é»˜è®¤æ„é€ å‡½æ•°ï¼ˆåˆå§‹åŒ–é»˜è®¤å€¼ï¼‰
     UserInfo();
 
-    // 2. ´ø²ÎÊı¹¹Ôìº¯Êı£¨¿ìËÙ³õÊ¼»¯ËùÓĞ×Ö¶Î£©
+    // 2. å¸¦å‚æ•°æ„é€ å‡½æ•°ï¼ˆå¿«é€Ÿåˆå§‹åŒ–æ‰€æœ‰å­—æ®µï¼‰
     UserInfo(uint64_t userId, const std::string& userAccount, const std::string& nickName,
-        const std::string& avatar, const int& gender, const std::string& signature,
+        const std::string& avatar, const int& gender, const std::string& region, const std::string& signature,
         const uint64_t& createTime, const int& state, const uint64_t& modifyTime);
 
-    // 3. ¿½±´¹¹Ôìº¯Êı£¨Éî¿½±´×Ö·û´®×Ö¶Î£©
+    // 3. æ‹·è´æ„é€ å‡½æ•°ï¼ˆæ·±æ‹·è´å­—ç¬¦ä¸²å­—æ®µï¼‰
     UserInfo(const UserInfo& other);
 
-    // 4. ¸³ÖµÔËËã·ûÖØÔØ£¨±ÜÃâÇ³¿½±´ÎÊÌâ£©
+    // 4. èµ‹å€¼è¿ç®—ç¬¦é‡è½½ï¼ˆé¿å…æµ…æ‹·è´é—®é¢˜ï¼‰
     UserInfo& operator=(const UserInfo& other);
 
-    // 5. Îö¹¹º¯Êı£¨×Ö·û´®×Ö¶ÎÎŞĞèÊÖ¶¯ÊÍ·Å£¬±àÒëÆ÷×Ô¶¯´¦Àí£©
+    // 5. ææ„å‡½æ•°ï¼ˆå­—ç¬¦ä¸²å­—æ®µæ— éœ€æ‰‹åŠ¨é‡Šæ”¾ï¼Œç¼–è¯‘å™¨è‡ªåŠ¨å¤„ç†ï¼‰
     ~UserInfo() = default;
 
-    // -------------------------- Getter º¯Êı£¨»ñÈ¡×Ö¶ÎÖµ£©--------------------------
-    uint64_t getUserId() const;                // »ñÈ¡ÓÃ»§ID
-    const std::string& getUserAccount() const;    // »ñÈ¡ÓÃ»§Ãû£¨·µ»ØconstÒıÓÃ£¬±ÜÃâ¿½±´£©
-    const std::string& getNickName() const;    // »ñÈ¡êÇ³Æ
-    const std::string& getAvatar() const;      // »ñÈ¡Í·ÏñURL
-    int getGender() const;                 // »ñÈ¡ĞÔ±ğ
-    const std::string& getSignature() const;   // »ñÈ¡¸öĞÔÇ©Ãû
-    const uint64_t& getCreateTime() const;      // »ñÈ¡×¢²áÊ±¼ä
-	const uint64_t& getModifyTime() const; //»ñÈ¡×îºóĞŞ¸ÄÊ±¼ä
+    // -------------------------- Getter å‡½æ•°ï¼ˆè·å–å­—æ®µå€¼ï¼‰--------------------------
+    uint64_t getUserId() const;                // è·å–ç”¨æˆ·ID
+    const std::string& getUserAccount() const;    // è·å–ç”¨æˆ·åï¼ˆè¿”å›constå¼•ç”¨ï¼Œé¿å…æ‹·è´ï¼‰
+    const std::string& getNickName() const;    // è·å–æ˜µç§°
+    const std::string& getAvatar() const;      // è·å–å¤´åƒURL
+    int getGender() const;                 // è·å–æ€§åˆ«
+    const std::string& getRegion() const;
+    const std::string& getSignature() const;   // è·å–ä¸ªæ€§ç­¾å
+    const uint64_t& getCreateTime() const;      // è·å–æ³¨å†Œæ—¶é—´
+	const uint64_t& getModifyTime() const; //è·å–æœ€åä¿®æ”¹æ—¶é—´
     const int& getState() const;
-    // -------------------------- Setter º¯Êı£¨ÉèÖÃ×Ö¶ÎÖµ£©--------------------------
-    void setUserId(uint64_t userId);                   // ÉèÖÃÓÃ»§ID
-    void setUserAccount(const std::string& userAccount);     // ÉèÖÃÓÃ»§Ãû£¨´«ÈëconstÒıÓÃ£¬±ÜÃâ¿½±´£©
-    void setNickName(const std::string& nickName);     // ÉèÖÃêÇ³Æ
-    void setAvatar(const std::string& avatar);         // ÉèÖÃÍ·ÏñURL
-    void setGender(uint8_t gender);                    // ÉèÖÃĞÔ±ğ£¨×Ô¶¯¹ıÂË·Ç·¨Öµ£º½ö0/1/2ÓĞĞ§£©
-    void setSignature(const std::string& signature);   // ÉèÖÃ¸öĞÔÇ©Ãû
-    void setCreateTime(const std::uint64_t& createTime);     // ÉèÖÃ×¢²áÊ±¼ä
-	void setModifyTime(const uint64_t& modifyTime); //ÉèÖÃ×îºóĞŞ¸ÄÊ±¼ä
-    void setCreateTimeNow();                           // ±ã½İ·½·¨£ºÉèÖÃ×¢²áÊ±¼äÎªµ±Ç°ÏµÍ³Ê±¼ä
+    // -------------------------- Setter å‡½æ•°ï¼ˆè®¾ç½®å­—æ®µå€¼ï¼‰--------------------------
+    void setUserId(uint64_t userId);                   // è®¾ç½®ç”¨æˆ·ID
+    void setUserAccount(const std::string& userAccount);     // è®¾ç½®ç”¨æˆ·åï¼ˆä¼ å…¥constå¼•ç”¨ï¼Œé¿å…æ‹·è´ï¼‰
+    void setNickName(const std::string& nickName);     // è®¾ç½®æ˜µç§°
+    void setAvatar(const std::string& avatar);         // è®¾ç½®å¤´åƒURL
+    void setGender(int gender);                    // è®¾ç½®æ€§åˆ«ï¼ˆè‡ªåŠ¨è¿‡æ»¤éæ³•å€¼ï¼šä»…0/1/2æœ‰æ•ˆï¼‰
+    void setRegion(const std::string& region);
+    void setSignature(const std::string& signature);   // è®¾ç½®ä¸ªæ€§ç­¾å
+    void setCreateTime(const std::uint64_t& createTime);     // è®¾ç½®æ³¨å†Œæ—¶é—´
+	void setModifyTime(const uint64_t& modifyTime); //è®¾ç½®æœ€åä¿®æ”¹æ—¶é—´
+    void setCreateTimeNow();                           // ä¾¿æ·æ–¹æ³•ï¼šè®¾ç½®æ³¨å†Œæ—¶é—´ä¸ºå½“å‰ç³»ç»Ÿæ—¶é—´
     void setState(const uint8_t& gender);
-    // ½«¶ÔÏó×ªÎª×Ö·û´®£¨µ÷ÊÔÓÃ£¬¸ñÊ½£ºkey=value£©
+    // å°†å¯¹è±¡è½¬ä¸ºå­—ç¬¦ä¸²ï¼ˆè°ƒè¯•ç”¨ï¼Œæ ¼å¼ï¼škey=valueï¼‰
     std::string toString() const;
 
 private:
-    // ³ÉÔ±±äÁ¿£¨ÍÕ·åÃüÃû£¬ÓëÊı¾İ¿â×Ö¶ÎÒ»Ò»¶ÔÓ¦£©
-    uint64_t userId;       // ÓÃ»§Î¨Ò»ID£¨¶ÔÓ¦Êı¾İ¿â userId£©
-    std::string userAccount;  // ÓÃ»§Ãû£¨¶ÔÓ¦Êı¾İ¿â userName£©
-    std::string nickName;  // ÓÃ»§êÇ³Æ£¨¶ÔÓ¦Êı¾İ¿â nickName£©
-    std::string avatar;    // Í·ÏñURL£¨¶ÔÓ¦Êı¾İ¿â avatar£©
-    int gender;        // ĞÔ±ğ£¨0=Î´Öª£¬1=ÄĞ£¬2=Å®£¬¶ÔÓ¦Êı¾İ¿â gender£©
-    std::string signature; // ¸öĞÔÇ©Ãû£¨¶ÔÓ¦Êı¾İ¿â signature£©
-    uint64_t createTime;    // ×¢²áÊ±¼ä£¨¶ÔÓ¦Êı¾İ¿â createTime£©
-    int state;   //ÊÇ·ñÔÚÏß
-    uint64_t modifyTime; //×îºóĞŞ¸ÄÊ±¼ä
+    // æˆå‘˜å˜é‡ï¼ˆé©¼å³°å‘½åï¼Œä¸æ•°æ®åº“å­—æ®µä¸€ä¸€å¯¹åº”ï¼‰
+    uint64_t userId;       // ç”¨æˆ·å”¯ä¸€IDï¼ˆå¯¹åº”æ•°æ®åº“ userIdï¼‰
+    std::string userAccount;  // ç”¨æˆ·åï¼ˆå¯¹åº”æ•°æ®åº“ userNameï¼‰
+    std::string nickName;  // ç”¨æˆ·æ˜µç§°ï¼ˆå¯¹åº”æ•°æ®åº“ nickNameï¼‰
+    std::string avatar;    // å¤´åƒURLï¼ˆå¯¹åº”æ•°æ®åº“ avatarï¼‰
+    int gender;        // æ€§åˆ«ï¼ˆ0=æœªçŸ¥ï¼Œ1=ç”·ï¼Œ2=å¥³ï¼Œå¯¹åº”æ•°æ®åº“ genderï¼‰
+    std::string region;
+    std::string signature; // ä¸ªæ€§ç­¾åï¼ˆå¯¹åº”æ•°æ®åº“ signatureï¼‰
+    uint64_t createTime;    // æ³¨å†Œæ—¶é—´ï¼ˆå¯¹åº”æ•°æ®åº“ createTimeï¼‰
+    int state;   //æ˜¯å¦åœ¨çº¿
+    uint64_t modifyTime; //æœ€åä¿®æ”¹æ—¶é—´
 
 };  
 

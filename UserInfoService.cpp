@@ -20,6 +20,7 @@ Json::Value UserInfoService::getUserAllInfo(const std::string& userId)
 	jsonObj["userName"] = userinfo.getUserAccount();
 	jsonObj["nickName"] = userinfo.getNickName();
 	jsonObj["gender"] = userinfo.getGender();
+	jsonObj["region"] = userinfo.getRegion();
 	jsonObj["avatar"] = userinfo.getAvatar();
 	//默认占位18 对齐前端结构
 	jsonObj["age"] = 18;
@@ -35,6 +36,7 @@ Json::Value UserInfoService::getUserAllInfo(const std::string& userId)
 		jsonfriendObj["nickName"] = friendInfo.getNickName();
 		jsonfriendObj["avatar"] = friendInfo.getAvatar();
 		jsonfriendObj["gender"] = friendInfo.getGender();
+		jsonfriendObj["region"] = friendInfo.getRegion();
 		jsonfriendObj["onlineStatus"] = friendInfo.getState()==1 ? true : false;
 		jsonfriendObj["signature"] = friendInfo.getSignature();
 		jsonfriendObj["remark"] = friendRelation.getFriendRemark(userId, friendInfo.getUserAccount());
@@ -52,10 +54,26 @@ Json::Value UserInfoService::modifyUserInfo(const Json::Value& userInfo)
 	UserInfoDao userInfoDao;
 	UserInfo userinfo;
 	std::string userId = userInfo["userName"].asString();
-	userinfo.setNickName(userInfo["nickName"].asString());
-	userinfo.setSignature(userInfo["signature"].asString());
-	userinfo.setAvatar(userInfo["avater"].asString());
 	jsonObj["code"] = 101;
+	try
+	{
+		userinfo.setNickName(userInfo["nickName"].asString());
+		userinfo.setSignature(userInfo["signature"].asString());
+		userinfo.setAvatar(userInfo["avater"].asString());
+		if (userInfo.isMember("gender"))
+		{
+			userinfo.setGender(userInfo["gender"].asInt());
+		}
+		if (userInfo.isMember("region"))
+		{
+			userinfo.setRegion(userInfo["region"].asString());
+		}
+	}
+	catch (const std::exception&)
+	{
+		jsonObj["code"] = 102;
+		return jsonObj;
+	}
 	if (userInfoDao.updateUserInfo(userId, userinfo) > 0)
 	{
 		jsonObj["code"] = 100;
@@ -71,4 +89,3 @@ void UserInfoService::handleHeartbeat(const std::string& userName)
 	}
 	HeartbeatManager::GetInstance().handleHeartbeat(userName);
 }
-

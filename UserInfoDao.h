@@ -1,6 +1,6 @@
 #pragma once
 #include <string>
-#include <ctime>  // ÓÃÓÚÊ±¼äÀàĞÍ£¨Êı¾İ¿â DATETIME ¶ÔÓ¦ C++ tm ½á¹¹Ìå£©
+#include <ctime>  // ç”¨äºæ—¶é—´ç±»å‹ï¼ˆæ•°æ®åº“ DATETIME å¯¹åº” C++ tm ç»“æ„ä½“ï¼‰
 #include <sstream>
 #include <iomanip>
 #include "Logger.h"
@@ -12,6 +12,7 @@ enum class UserInfoValueType {
 	nickName,
 	avatar,
 	gender,
+	region,
 	signature,
 	createTime,
 	state,
@@ -22,13 +23,13 @@ class UserInfoDao
 {
 public:
 	UserInfoDao();
-	//²åÈëÓÃ»§ĞÅÏ¢
+	//æ’å…¥ç”¨æˆ·ä¿¡æ¯
 	int insertUserInfo(const UserInfo& userInfo);
-	//¸ù¾İÓÃ»§ÕËºÅ»ñÈ¡ÓÃ»§ËùÓĞĞÅÏ¢
+	//æ ¹æ®ç”¨æˆ·è´¦å·è·å–ç”¨æˆ·æ‰€æœ‰ä¿¡æ¯
 	UserInfo getUserinfo(const std::string& userId)const;
-	//¸ù¾İÓÃ»§ÕËºÅ¸ü¸ÄÓÃ»§Ö¸¶¨ĞÅÏ¢ userName(ÕËºÅ)ºÍ´´½¨Ê±¼äÎŞ·¨ĞŞ¸Ä
+	//æ ¹æ®ç”¨æˆ·è´¦å·æ›´æ”¹ç”¨æˆ·æŒ‡å®šä¿¡æ¯ userName(è´¦å·)å’Œåˆ›å»ºæ—¶é—´æ— æ³•ä¿®æ”¹
 	int updateUserInfo(const std::string& userId,const UserInfo& userInfo);
-	//¸ù¾İÓÃ»§ÕËºÅ»ñÈ¡¶ÔÓ¦¼üÖµ
+	//æ ¹æ®ç”¨æˆ·è´¦å·è·å–å¯¹åº”é”®å€¼
 	UserInfo getUserValueWithType(const UserInfoValueType& type, const std::string& userId)const;
 	
 	
@@ -36,4 +37,3 @@ private:
 	std::map<UserInfoValueType, std::string> userInfoKey;
 
 };
-

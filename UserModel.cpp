@@ -1,58 +1,62 @@
-#include "userModel.h"
-#include <stdexcept>  // ÓÃÓÚÅ×³ö·Ç·¨²ÎÊıÒì³££¨¿ÉÑ¡£©
+#include "UserModel.h"
+#include <stdexcept>  // ç”¨äºæŠ›å‡ºéæ³•å‚æ•°å¼‚å¸¸ï¼ˆå¯é€‰ï¼‰
 
-// 1. Ä¬ÈÏ¹¹Ôìº¯Êı£º³õÊ¼»¯Ä¬ÈÏÖµ
-UserInfo::UserInfo()// state(2)£¬Ä¬ÈÏÖµÎª2 SQLÓï¾äÖĞÎª2Ôò±íÊ¾²»Ğ´Èë
-	: userId(0), gender(0), state(2){  // userIdÄ¬ÈÏ0£¨Î´·ÖÅä£©£¬ĞÔ±ğÄ¬ÈÏ0£¨Î´Öª£©
-	// ³õÊ¼»¯×¢²áÊ±¼äÎªµ±Ç°ÏµÍ³Ê±¼ä
+// 1. é»˜è®¤æ„é€ å‡½æ•°ï¼šåˆå§‹åŒ–é»˜è®¤å€¼
+UserInfo::UserInfo()// state(2)ï¼Œé»˜è®¤å€¼ä¸º2 SQLè¯­å¥ä¸­ä¸º2åˆ™è¡¨ç¤ºä¸å†™å…¥
+	: userId(0), gender(-1), state(2){
+	// åˆå§‹åŒ–æ³¨å†Œæ—¶é—´ä¸ºå½“å‰ç³»ç»Ÿæ—¶é—´
 	//setCreateTimeNow();
 }
 
-// 2. ´ø²ÎÊı¹¹Ôìº¯Êı£º¿ìËÙ³õÊ¼»¯ËùÓĞ×Ö¶Î
+// 2. å¸¦å‚æ•°æ„é€ å‡½æ•°ï¼šå¿«é€Ÿåˆå§‹åŒ–æ‰€æœ‰å­—æ®µ
 UserInfo::UserInfo(uint64_t userId, const std::string& userAccount, const std::string& nickName,
-	const std::string& avatar, const int& gender, const std::string& signature,
+	const std::string& avatar, const int& gender, const std::string& region, const std::string& signature,
 	const uint64_t& createTime, const int& state, const uint64_t& modifyTime) {
 	this->userId = userId;
 	this->userAccount = userAccount;
 	this->nickName = nickName;
 	this->avatar = avatar;
+	this->region = region;
 	this->signature = signature;
 	this->createTime = createTime;
 	this->state = state;
 	this->modifyTime = modifyTime;
-	// µ÷ÓÃsetGenderÈ·±£ĞÔ±ğÖµºÏ·¨
+	// è°ƒç”¨setGenderç¡®ä¿æ€§åˆ«å€¼åˆæ³•
 	setGender(gender);
 }
 
-// 3. ¿½±´¹¹Ôìº¯Êı£ºÉî¿½±´£¨×Ö·û´®×Ö¶ÎÄ¬ÈÏÉî¿½±´£¬ÎŞĞè¶îÍâ´¦Àí£©
+// 3. æ‹·è´æ„é€ å‡½æ•°ï¼šæ·±æ‹·è´ï¼ˆå­—ç¬¦ä¸²å­—æ®µé»˜è®¤æ·±æ‹·è´ï¼Œæ— éœ€é¢å¤–å¤„ç†ï¼‰
 UserInfo::UserInfo(const UserInfo& other) {
 	this->userId = other.userId;
 	this->userAccount = other.userAccount;
 	this->nickName = other.nickName;
 	this->avatar = other.avatar;
 	this->gender = other.gender;
+	this->region = other.region;
 	this->signature = other.signature;
 	this->createTime = other.createTime;
 	this->state = other.state;
 	this->modifyTime = other.modifyTime;
 }
 
-// 4. ¸³ÖµÔËËã·ûÖØÔØ£ºÉî¿½±´
+// 4. èµ‹å€¼è¿ç®—ç¬¦é‡è½½ï¼šæ·±æ‹·è´
 UserInfo& UserInfo::operator=(const UserInfo& other) {
-	if (this != &other) {  // ±ÜÃâ×Ô¸³Öµ
+	if (this != &other) {  // é¿å…è‡ªèµ‹å€¼
 		this->userId = other.userId;
 		this->userAccount = other.userAccount;
 		this->nickName = other.nickName;
 		this->avatar = other.avatar;
 		this->gender = other.gender;
+		this->region = other.region;
 		this->signature = other.signature;
 		this->createTime = other.createTime;
 		this->state = other.state;
+		this->modifyTime = other.modifyTime;
 	}
 	return *this;
 }
 
-// -------------------------- Getter º¯ÊıÊµÏÖ --------------------------
+// -------------------------- Getter å‡½æ•°å®ç° --------------------------
 uint64_t UserInfo::getUserId() const {
 	return userId;
 }
@@ -73,6 +77,10 @@ int UserInfo::getGender() const {
 	return gender;
 }
 
+const std::string& UserInfo::getRegion() const {
+	return region;
+}
+
 const std::string& UserInfo::getSignature() const {
 	return signature;
 }
@@ -91,9 +99,9 @@ const int& UserInfo::getState() const
 	return state;
 }
 
-// -------------------------- Setter º¯ÊıÊµÏÖ --------------------------
+// -------------------------- Setter å‡½æ•°å®ç° --------------------------
 void UserInfo::setUserId(uint64_t userId) {
-	// ¿ÉÑ¡£ºÏŞÖÆuserId²»ÄÜÎª0£¨¸ù¾İÒµÎñĞèÇó£©
+	// å¯é€‰ï¼šé™åˆ¶userIdä¸èƒ½ä¸º0ï¼ˆæ ¹æ®ä¸šåŠ¡éœ€æ±‚ï¼‰
 	if (userId == 0) {
 		throw std::invalid_argument("userId cannot be 0");
 	}
@@ -101,7 +109,7 @@ void UserInfo::setUserId(uint64_t userId) {
 }
 
 void UserInfo::setUserAccount(const std::string& userAccount) {
-	// ¿ÉÑ¡£ºĞ£ÑéÓÃ»§Ãû³¤¶È£¨Êı¾İ¿â×Ö¶ÎVARCHAR(50)£¬×î³¤50×Ö·û£©
+	// å¯é€‰ï¼šæ ¡éªŒç”¨æˆ·åé•¿åº¦ï¼ˆæ•°æ®åº“å­—æ®µVARCHAR(50)ï¼Œæœ€é•¿50å­—ç¬¦ï¼‰
 	if (userAccount.length() > 50) {
 		throw std::invalid_argument("userName length cannot exceed 50 characters");
 	}
@@ -109,7 +117,7 @@ void UserInfo::setUserAccount(const std::string& userAccount) {
 }
 
 void UserInfo::setNickName(const std::string& nickName) {
-	// Ğ£ÑéêÇ³Æ³¤¶È£¨Êı¾İ¿âVARCHAR(50)£©
+	// æ ¡éªŒæ˜µç§°é•¿åº¦ï¼ˆæ•°æ®åº“VARCHAR(50)ï¼‰
 	if (nickName.length() > 50) {
 		throw std::invalid_argument("nickName length cannot exceed 50 characters");
 	}
@@ -117,26 +125,33 @@ void UserInfo::setNickName(const std::string& nickName) {
 }
 
 void UserInfo::setAvatar(const std::string& avatar) {
-	// Ğ£ÑéÍ·ÏñURL³¤¶È£¨Êı¾İ¿âVARCHAR(255)£©
+	// æ ¡éªŒå¤´åƒURLé•¿åº¦ï¼ˆæ•°æ®åº“VARCHAR(255)ï¼‰
 	if (avatar.length() > 255) {
 		throw std::invalid_argument("avatar URL length cannot exceed 255 characters");
 	}
 	this->avatar = avatar;
 }
 
-void UserInfo::setGender(uint8_t gender) {
-	// Ğ£ÑéĞÔ±ğºÏ·¨ĞÔ£¨½ö0=Î´Öª£¬1=ÄĞ£¬2=Å®£©
-	if (gender > 2) {
-		// ·½°¸1£ºÅ×³öÒì³££¨ÑÏ¸ñĞ£Ñé£©
+void UserInfo::setGender(int gender) {
+	// æ ¡éªŒæ€§åˆ«åˆæ³•æ€§ï¼ˆä»…0=æœªçŸ¥ï¼Œ1=ç”·ï¼Œ2=å¥³ï¼‰
+	if (gender < -1 || gender > 2) {
+		// æ–¹æ¡ˆ1ï¼šæŠ›å‡ºå¼‚å¸¸ï¼ˆä¸¥æ ¼æ ¡éªŒï¼‰
 		throw std::invalid_argument("gender must be 0 (unknown), 1 (male), or 2 (female)");
-		// ·½°¸2£ºÄ¬ÈÏÉèÎª0£¨¿íËÉĞ£Ñé£¬±ÜÃâ±ÀÀ££©
+		// æ–¹æ¡ˆ2ï¼šé»˜è®¤è®¾ä¸º0ï¼ˆå®½æ¾æ ¡éªŒï¼Œé¿å…å´©æºƒï¼‰
 		// this->gender = 0;
 	}
 	this->gender = gender;
 }
 
+void UserInfo::setRegion(const std::string& region) {
+	if (region.length() > 100) {
+		throw std::invalid_argument("region length cannot exceed 100 characters");
+	}
+	this->region = region;
+}
+
 void UserInfo::setSignature(const std::string& signature) {
-	// Ğ£Ñé¸öĞÔÇ©Ãû³¤¶È£¨Êı¾İ¿âVARCHAR(200)£©
+	// æ ¡éªŒä¸ªæ€§ç­¾åé•¿åº¦ï¼ˆæ•°æ®åº“VARCHAR(200)ï¼‰
 	if (signature.length() > 200) {
 		throw std::invalid_argument("signature length cannot exceed 200 characters");
 	}
@@ -152,7 +167,7 @@ void UserInfo::setModifyTime(const uint64_t& modifyTime)
 	this->modifyTime = modifyTime;
 }
 
-// ±ã½İ·½·¨£ºÉèÖÃ×¢²áÊ±¼äÎªµ±Ç°ÏµÍ³Ê±¼ä
+// ä¾¿æ·æ–¹æ³•ï¼šè®¾ç½®æ³¨å†Œæ—¶é—´ä¸ºå½“å‰ç³»ç»Ÿæ—¶é—´
 void UserInfo::setCreateTimeNow() {
 	time_t now = time(nullptr);
 	std::tm localnow{};
@@ -166,17 +181,18 @@ void UserInfo::setState(const uint8_t& state)
 	this->state = state;
 }
 
-// -------------------------- ¸¨Öúº¯Êı£º¶ÔÏó×ª×Ö·û´®£¨µ÷ÊÔÓÃ£©--------------------------
+// -------------------------- è¾…åŠ©å‡½æ•°ï¼šå¯¹è±¡è½¬å­—ç¬¦ä¸²ï¼ˆè°ƒè¯•ç”¨ï¼‰--------------------------
 std::string UserInfo::toString() const {
 
-	// Æ´½ÓËùÓĞ×Ö¶Î
+	// æ‹¼æ¥æ‰€æœ‰å­—æ®µ
 	std::stringstream result;
 	result << "UserInfo{"
 		<< "userId=" << userId
 		<< ", userAccount='" << userAccount << '\''
 		<< ", nickName='" << nickName << '\''
 		<< ", avatar='" << avatar << '\''
-		<< ", gender=" << (gender == 0 ? "Î´Öª" : (gender == 1 ? "ÄĞ" : "Å®"))
+		<< ", gender=" << (gender == 0 ? "æœªçŸ¥" : (gender == 1 ? "ç”·" : "å¥³"))
+		<< ", region='" << region << '\''
 		<< ", signature='" << signature << '\''
 		<< ", createTime='" << createTime << '\''
 		<< '}';

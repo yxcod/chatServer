@@ -9,6 +9,7 @@ UserInfoDao::UserInfoDao()
     userInfoKey[UserInfoValueType::nickName] = "nickName";
     userInfoKey[UserInfoValueType::avatar] = "avatar";
     userInfoKey[UserInfoValueType::gender] = "gender";
+    userInfoKey[UserInfoValueType::region] = "region";
     userInfoKey[UserInfoValueType::signature] = "signature";
     userInfoKey[UserInfoValueType::createTime] = "createTime";
     userInfoKey[UserInfoValueType::state] = "state";
@@ -19,8 +20,8 @@ int UserInfoDao::insertUserInfo(const UserInfo& userInfo)
 {
     std::string insertSql =
         "INSERT INTO userinfo "
-        "(userName, nickName, avatar, gender, signature, createTime, state, modifyTime) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        "(userName, nickName, avatar, gender, region, signature, createTime, state, modifyTime) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
     auto con = Logger::GetInstance().createConnection();
 
@@ -32,10 +33,11 @@ int UserInfoDao::insertUserInfo(const UserInfo& userInfo)
         pstmt->setString(2, userInfo.getNickName());
         pstmt->setString(3, userInfo.getAvatar());
         pstmt->setUInt(4, userInfo.getGender());
-        pstmt->setString(5, userInfo.getSignature());
-        pstmt->setUInt64(6, userInfo.getCreateTime());
-        pstmt->setInt(7, userInfo.getState());
-        pstmt->setInt(8, userInfo.getModifyTime());
+        pstmt->setString(5, userInfo.getRegion());
+        pstmt->setString(6, userInfo.getSignature());
+        pstmt->setUInt64(7, userInfo.getCreateTime());
+        pstmt->setInt(8, userInfo.getState());
+        pstmt->setInt(9, userInfo.getModifyTime());
         return pstmt->executeUpdate();
     }
     catch (...)
@@ -65,6 +67,7 @@ UserInfo UserInfoDao::getUserinfo(const std::string& userId) const
             userInfo.setNickName(res->getString("nickName"));
             userInfo.setAvatar(res->getString("avatar"));
             userInfo.setGender(res->getUInt("gender"));
+            userInfo.setRegion(res->getString("region"));
             userInfo.setSignature(res->getString("signature"));
             userInfo.setCreateTime(res->getUInt64("createTime"));
             userInfo.setState(res->getUInt("state"));
@@ -73,7 +76,7 @@ UserInfo UserInfoDao::getUserinfo(const std::string& userId) const
     }
     catch (...)
     {
-        // 保持默认 userInfo 返回
+        // 淇濇寔榛樿 userInfo 杩斿洖
     }
 
     return userInfo;
@@ -85,7 +88,8 @@ int UserInfoDao::updateUserInfo(const std::string& userId, const UserInfo& userI
         "UPDATE userinfo SET "
         "nickName = CASE WHEN ? <> '' THEN ? ELSE nickName END, "
         "avatar = CASE WHEN ? <> '' THEN ? ELSE avatar END, "
-        "gender = CASE WHEN ? <> 0 THEN ? ELSE gender END, "
+        "gender = CASE WHEN ? >= 0 THEN ? ELSE gender END, "
+        "region = CASE WHEN ? <> '' THEN ? ELSE region END, "
         "signature = CASE WHEN ? <> '' THEN ? ELSE signature END, "
         "state = CASE WHEN ? <> 2 THEN ? ELSE state END, "
         "modifyTime = ? "
@@ -106,22 +110,26 @@ int UserInfoDao::updateUserInfo(const std::string& userId, const UserInfo& userI
         pstmt->setString(3, avatar);
         pstmt->setString(4, avatar);
 
-        const unsigned int gender = userInfo.getGender();
-        pstmt->setUInt(5, gender);
-        pstmt->setUInt(6, gender);
+        const int gender = userInfo.getGender();
+        pstmt->setInt(5, gender);
+        pstmt->setInt(6, gender);
+
+        const std::string region = userInfo.getRegion();
+        pstmt->setString(7, region);
+        pstmt->setString(8, region);
 
         const std::string sig = userInfo.getSignature();
-        pstmt->setString(7, sig);
-        pstmt->setString(8, sig);
+        pstmt->setString(9, sig);
+        pstmt->setString(10, sig);
 
         const unsigned int state = userInfo.getState();
-        pstmt->setUInt(9, state);
-        pstmt->setUInt(10, state);
+        pstmt->setUInt(11, state);
+        pstmt->setUInt(12, state);
 
         const uint64_t now = Logger::GetInstance().getcurrentTime();
-        pstmt->setUInt64(11, now);
+        pstmt->setUInt64(13, now);
 
-        pstmt->setString(12, userId);
+        pstmt->setString(14, userId);
 
         return pstmt->executeUpdate();
     }
@@ -168,6 +176,9 @@ UserInfo UserInfoDao::getUserValueWithType(const UserInfoValueType& type, const 
         case UserInfoValueType::gender:
             userInfo.setGender(res->getUInt("gender"));
             break;
+        case UserInfoValueType::region:
+            userInfo.setRegion(res->getString("region"));
+            break;
         case UserInfoValueType::signature:
             userInfo.setSignature(res->getString("signature"));
             break;
@@ -183,6 +194,7 @@ UserInfo UserInfoDao::getUserValueWithType(const UserInfoValueType& type, const 
             userInfo.setNickName(res->getString("nickName"));
             userInfo.setAvatar(res->getString("avatar"));
             userInfo.setGender(res->getUInt("gender"));
+            userInfo.setRegion(res->getString("region"));
             userInfo.setSignature(res->getString("signature"));
             userInfo.setCreateTime(res->getUInt64("createTime"));
             userInfo.setState(res->getUInt("state"));
@@ -193,7 +205,7 @@ UserInfo UserInfoDao::getUserValueWithType(const UserInfoValueType& type, const 
     }
     catch (...)
     {
-        // 出错返回默认 userInfo
+        // 鍑洪敊杩斿洖榛樿 userInfo
     }
 
     return userInfo;
