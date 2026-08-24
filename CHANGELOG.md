@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-08-25
+
+- Fixed Tencent Flash ASR requests so Drogon no longer percent-encodes the
+  signed query separator, which previously produced non-JSON gateway replies.
+- Added content-type-independent Tencent response parsing and safe HTTP/body
+  diagnostics for failed transcription requests.
+
 ## 2026-08-24 - Persistent quoted messages
 
 - Added `extendInfo` persistence for group messages so quoted-message metadata survives history reloads.

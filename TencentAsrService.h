@@ -6,7 +6,9 @@
 
 struct TencentAsrResult {
     int providerCode{0};
+    int httpStatus{0};
     std::string providerMessage;
+    std::string providerBodyPreview;
     std::string requestId;
     std::string transcript;
     std::uint32_t audioDurationMs{0};

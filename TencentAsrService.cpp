@@ -160,17 +160,37 @@ TencentAsrResult parseResponse(const drogon::HttpResponsePtr& response)
         result.providerMessage = "Tencent ASR returned an empty response";
         return result;
     }
-    const auto json = response->getJsonObject();
-    if (!json) {
+    result.httpStatus = static_cast<int>(response->getStatusCode());
+    std::string body(response->body());
+    if (body.size() >= 3 &&
+        static_cast<unsigned char>(body[0]) == 0xef &&
+        static_cast<unsigned char>(body[1]) == 0xbb &&
+        static_cast<unsigned char>(body[2]) == 0xbf) {
+        body.erase(0, 3);
+    }
+    const auto previewLength = std::min<std::size_t>(body.size(), 300);
+    result.providerBodyPreview.assign(body.data(), previewLength);
+    std::replace_if(result.providerBodyPreview.begin(),
+        result.providerBodyPreview.end(), [](unsigned char character) {
+            return character < 0x20 || character == 0x7f;
+        }, ' ');
+
+    Json::CharReaderBuilder builder;
+    Json::Value json;
+    std::string errors;
+    const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+    if (body.empty() || !reader->parse(
+        body.data(), body.data() + body.size(), &json, &errors)) {
         result.providerCode = -1;
-        result.providerMessage = "Tencent ASR returned invalid JSON";
+        result.providerMessage = "Tencent ASR returned invalid JSON (HTTP " +
+            std::to_string(result.httpStatus) + ")";
         return result;
     }
-    result.providerCode = (*json)["code"].asInt();
-    result.providerMessage = (*json)["message"].asString();
-    result.requestId = (*json)["request_id"].asString();
-    result.audioDurationMs = (*json)["audio_duration"].asUInt();
-    const auto& flashResult = (*json)["flash_result"];
+    result.providerCode = json["code"].asInt();
+    result.providerMessage = json["message"].asString();
+    result.requestId = json["request_id"].asString();
+    result.audioDurationMs = json["audio_duration"].asUInt();
+    const auto& flashResult = json["flash_result"];
     if (flashResult.isArray() && !flashResult.empty()) {
         result.transcript = flashResult[0]["text"].asString();
     }
@@ -208,7 +228,8 @@ void TencentAsrService::transcribe(
         {"word_info", "0"}
     };
     const std::string query = makeQuery(parameters);
-    const std::string path = "/asr/flash/v1/" + config.appId + "?" + query;
+    const std::string basePath = "/asr/flash/v1/" + config.appId;
+    const std::string path = basePath + "?" + query;
 
     std::string authorization;
     try {
@@ -224,10 +245,17 @@ void TencentAsrService::transcribe(
     try {
         auto request = drogon::HttpRequest::newHttpRequest();
         request->setMethod(drogon::Post);
+        // Drogon encodes setPath() by default. Encoding the '?' turns the
+        // signed query into part of the path and Tencent responds with an
+        // HTML gateway/404 body instead of its documented JSON payload.
+        request->setPathEncode(false);
         request->setPath(path);
         request->setContentTypeCode(drogon::CT_APPLICATION_OCTET_STREAM);
         request->addHeader("Host", "asr.cloud.tencent.com");
         request->addHeader("Authorization", authorization);
+        request->addHeader("Accept", "application/json");
+        request->addHeader("Accept-Encoding", "identity");
+        request->addHeader("Content-Length", std::to_string(audioData.size()));
         request->setBody(std::move(audioData));
 
         auto client = drogon::HttpClient::newHttpClient("https://asr.cloud.tencent.com");

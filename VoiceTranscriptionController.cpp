@@ -170,7 +170,10 @@ void VoiceTranscriptionController::transcribe(
                 Logger::GetInstance().warning(
                     "Tencent ASR request failed: code=" +
                     std::to_string(result.providerCode) +
-                    ", requestId=" + result.requestId);
+                    ", httpStatus=" + std::to_string(result.httpStatus) +
+                    ", requestId=" + result.requestId +
+                    ", message=" + result.providerMessage +
+                    ", responsePreview=" + result.providerBodyPreview);
                 Json::Value response;
                 response["code"] = 502;
                 response["message"] = result.providerMessage.empty()
