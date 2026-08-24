@@ -1,6 +1,24 @@
 #include "FriendRelationDao.h"
 #include "UserInfoDao.h"
 
+namespace
+{
+void readOptionalFriendRegion(sql::ResultSet& result, UserInfo& userInfo)
+{
+    try
+    {
+        userInfo.setRegion(result.getString("region"));
+    }
+    catch (const std::exception& error)
+    {
+        userInfo.setRegion("");
+        Logger::GetInstance().error(
+            std::string("Friend region is unavailable; apply sql/user_profile_region.sql: ") +
+            error.what());
+    }
+}
+}
+
 FriendRelationDao::FriendRelationDao()
 {
 }
@@ -34,16 +52,23 @@ void FriendRelationDao::getAllFriendWithUserId(const std::string& userId, const 
             userInfo.setNickName(res->getString("nickName"));
             userInfo.setAvatar(res->getString("avatar"));
             userInfo.setGender(res->getUInt("gender"));
-            userInfo.setRegion(res->getString("region"));
+            readOptionalFriendRegion(*res, userInfo);
             userInfo.setSignature(res->getString("signature"));
             userInfo.setCreateTime(res->getUInt64("createTime"));
             userInfo.setState(res->getUInt("state"));
+            userInfo.setModifyTime(res->getUInt64("modifyTime"));
             userInfoVector.push_back(userInfo);
         }
     }
+    catch (const std::exception& error)
+    {
+        Logger::GetInstance().error(
+            std::string("Failed to load friend list for ") + userId + ": " + error.what());
+    }
     catch (...)
     {
-        // 出错时直接返回当前已收集的数据
+        Logger::GetInstance().error(
+            std::string("Failed to load friend list for ") + userId + ": unknown exception");
     }
 
     userInfoList = std::move(userInfoVector);

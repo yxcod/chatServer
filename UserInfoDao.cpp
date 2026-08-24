@@ -1,6 +1,24 @@
 #include "UserInfoDao.h"
 #include "Logger.h"
 
+namespace
+{
+void readOptionalRegion(sql::ResultSet& result, UserInfo& userInfo)
+{
+    try
+    {
+        userInfo.setRegion(result.getString("region"));
+    }
+    catch (const std::exception& error)
+    {
+        userInfo.setRegion("");
+        Logger::GetInstance().error(
+            std::string("userinfo.region is unavailable; apply sql/user_profile_region.sql: ") +
+            error.what());
+    }
+}
+}
+
 // userId, userName, nickName, avatar, gender, signature, createTime, state
 UserInfoDao::UserInfoDao()
 {
@@ -67,16 +85,22 @@ UserInfo UserInfoDao::getUserinfo(const std::string& userId) const
             userInfo.setNickName(res->getString("nickName"));
             userInfo.setAvatar(res->getString("avatar"));
             userInfo.setGender(res->getUInt("gender"));
-            userInfo.setRegion(res->getString("region"));
+            readOptionalRegion(*res, userInfo);
             userInfo.setSignature(res->getString("signature"));
             userInfo.setCreateTime(res->getUInt64("createTime"));
             userInfo.setState(res->getUInt("state"));
             userInfo.setModifyTime(res->getUInt64("modifyTime"));
         }
     }
+    catch (const std::exception& error)
+    {
+        Logger::GetInstance().error(
+            std::string("Failed to load user info for ") + userId + ": " + error.what());
+    }
     catch (...)
     {
-        // 保持默认 userInfo 返回
+        Logger::GetInstance().error(
+            std::string("Failed to load user info for ") + userId + ": unknown exception");
     }
 
     return userInfo;
@@ -177,7 +201,7 @@ UserInfo UserInfoDao::getUserValueWithType(const UserInfoValueType& type, const 
             userInfo.setGender(res->getUInt("gender"));
             break;
         case UserInfoValueType::region:
-            userInfo.setRegion(res->getString("region"));
+            readOptionalRegion(*res, userInfo);
             break;
         case UserInfoValueType::signature:
             userInfo.setSignature(res->getString("signature"));
