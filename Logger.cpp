@@ -1,4 +1,5 @@
 #include "Logger.h"
+#include "CrashHandler.h"
 
 #include <algorithm>
 #include <cctype>
@@ -106,6 +107,11 @@ void Logger::initService()
         {drogon::Post, drogon::Get});
 
     std::cout << "Server running at http://127.0.0.1:5555/hello\n";
+    // Some networking/runtime libraries replace process-wide handlers during
+    // initialization. Reinstall immediately before entering the event loop.
+    CrashHandler::install(CrashHandler::defaultLogDirectory());
+    info(std::string("Crash reports directory: ") +
+         (CrashHandler::defaultLogDirectory() / "crashes").u8string());
     drogon::app().run();
 }
 

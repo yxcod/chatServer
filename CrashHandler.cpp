@@ -66,6 +66,16 @@ std::filesystem::path crashDirectory()
     return gLogDirectory / "crashes";
 }
 
+void writeHandlerStatus()
+{
+    const auto statusPath = crashDirectory() / "crash-handler-ready.log";
+    std::ofstream out(statusPath, std::ios::out | std::ios::trunc);
+    out << "ChatServer crash handler is active\n";
+    out << "installed_at: " << timestampForLog() << '\n';
+    out << "crash_directory: " << crashDirectory().u8string() << '\n';
+    out << "note: crash-*.log and crash-*.dmp are created only after a fatal error\n";
+}
+
 std::filesystem::path createCrashPath(const char* extension)
 {
 #ifdef _WIN32
@@ -404,6 +414,7 @@ void CrashHandler::install(const std::filesystem::path& logDirectory)
     SetUnhandledExceptionFilter(unhandledExceptionHandler);
 #endif
     std::filesystem::create_directories(crashDirectory());
+    writeHandlerStatus();
 }
 
 void CrashHandler::recordFatalError(const std::string& reason) noexcept

@@ -1,4 +1,5 @@
 #include "UserLocationController.h"
+#include <algorithm>
 #include <cmath>
 #include <json/json.h>
 #include "FriendRelationDao.h"
@@ -19,8 +20,11 @@ double distanceMeters(const UserLocationModel& a, const UserLocationModel& b) {
     constexpr double radius = 6371000.0;
     const auto lat = radians(b.getLatitude() - a.getLatitude());
     const auto lon = radians(b.getLongitude() - a.getLongitude());
-    const auto value = std::sin(lat/2)*std::sin(lat/2) + std::cos(radians(a.getLatitude())) *
+    const auto rawValue = std::sin(lat/2)*std::sin(lat/2) + std::cos(radians(a.getLatitude())) *
         std::cos(radians(b.getLatitude())) * std::sin(lon/2)*std::sin(lon/2);
+    // Floating-point rounding can put the Haversine value just outside [0, 1].
+    // Clamp it before sqrt so malformed coordinates can never produce NaN.
+    const auto value = std::clamp(rawValue, 0.0, 1.0);
     return radius * 2 * std::atan2(std::sqrt(value), std::sqrt(1-value));
 }
 }
@@ -34,23 +38,50 @@ void UserLocationController::update(const drogon::HttpRequestPtr& req, std::func
         item.setAccuracy(accuracy); item.setUpdatedAt(Logger::GetInstance().getcurrentTime());
         if (!UserLocationDao().upsert(item)) { callback(response(500, "Update failed")); return; }
         Json::Value value; value["code"] = 100; value["updatedAt"] = Json::UInt64(item.getUpdatedAt()); callback(drogon::HttpResponse::newHttpJsonResponse(value));
-    } catch (...) { callback(response(500, "Update failed")); }
+    } catch (const std::exception& error) {
+        Logger::GetInstance().error(std::string("Location update failed for ") + userName + ": " + error.what());
+        callback(response(500, "Update failed"));
+    } catch (...) {
+        Logger::GetInstance().error(std::string("Location update failed for ") + userName + ": unknown exception");
+        callback(response(500, "Update failed"));
+    }
 }
 
 void UserLocationController::distance(const drogon::HttpRequestPtr& req, std::function<void(const drogon::HttpResponsePtr&)>&& callback) {
     const auto json = req->getJsonObject(); if (!json) { callback(response(400, "Invalid JSON")); return; }
     const auto userName = (*json)["userName"].asString(); const auto peer = (*json)["peerUserName"].asString();
-    if (userName.empty() || peer.empty() || !acceptedFriends(userName, peer)) { callback(response(403, "Friend relationship required")); return; }
-    try { const auto mine = UserLocationDao().get(userName); const auto theirs = UserLocationDao().get(peer);
+    if (userName.empty() || peer.empty() || userName == peer) { callback(response(400, "Invalid users")); return; }
+    try {
+        // Keep relationship lookup inside this boundary. Connection-pool acquisition
+        // can throw before the DAO's own query catch block is entered.
+        if (!acceptedFriends(userName, peer)) {
+            callback(response(403, "Friend relationship required"));
+            return;
+        }
+        const auto mine = UserLocationDao().get(userName); const auto theirs = UserLocationDao().get(peer);
         Json::Value value; value["code"] = 100; value["available"] = mine.has_value() && theirs.has_value();
         if (mine && theirs) { value["distanceMeters"] = static_cast<Json::UInt64>(std::llround(distanceMeters(*mine, *theirs)));
             value["peerUpdatedAt"] = Json::UInt64(theirs->getUpdatedAt()); }
         callback(drogon::HttpResponse::newHttpJsonResponse(value));
-    } catch (...) { callback(response(500, "Distance failed")); }
+    } catch (const std::exception& error) {
+        Logger::GetInstance().error(std::string("Distance lookup failed for ") + userName + " -> " + peer + ": " + error.what());
+        callback(response(500, "Distance failed"));
+    } catch (...) {
+        Logger::GetInstance().error(std::string("Distance lookup failed for ") + userName + " -> " + peer + ": unknown exception");
+        callback(response(500, "Distance failed"));
+    }
 }
 
 void UserLocationController::clear(const drogon::HttpRequestPtr& req, std::function<void(const drogon::HttpResponsePtr&)>&& callback) {
     const auto json = req->getJsonObject(); if (!json || (*json)["userName"].asString().empty()) { callback(response(400, "Invalid user")); return; }
-    try { UserLocationDao().clear((*json)["userName"].asString()); callback(response(100, "success")); }
-    catch (...) { callback(response(500, "Clear failed")); }
+    const auto userName = (*json)["userName"].asString();
+    try { UserLocationDao().clear(userName); callback(response(100, "success")); }
+    catch (const std::exception& error) {
+        Logger::GetInstance().error(std::string("Location clear failed for ") + userName + ": " + error.what());
+        callback(response(500, "Clear failed"));
+    }
+    catch (...) {
+        Logger::GetInstance().error(std::string("Location clear failed for ") + userName + ": unknown exception");
+        callback(response(500, "Clear failed"));
+    }
 }
