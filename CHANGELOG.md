@@ -20,6 +20,8 @@ All notable project changes are documented in this file.
 
 ### Fixed
 
+- Enabled UTF-8 compilation for `UserModel.cpp`, preventing Chinese string
+  literals such as gender labels from being misparsed under code page 936.
 - Fixed the MSVC build failure in private chat history deletion caused by the
   Windows `min` macro expanding the qualified `std::min` call.
 - Enabled UTF-8 compilation for `ChatDao.cpp` so Chinese comments and existing

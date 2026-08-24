@@ -179,7 +179,9 @@
     <ClCompile Include="UserLoginService.cpp">
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
-    <ClCompile Include="UserModel.cpp" />
+    <ClCompile Include="UserModel.cpp">
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="UserLocationController.cpp" />
     <ClCompile Include="UserLocationDao.cpp" />
   </ItemGroup>
