@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <json/json.h>
@@ -12,6 +13,11 @@
 #include <openssl/hmac.h>
 #include <sstream>
 #include <stdexcept>
+#include <vector>
+
+#ifdef _WIN32
+#include <Windows.h>
+#endif
 
 #include <drogon/HttpClient.h>
 #include <drogon/HttpRequest.h>
@@ -24,12 +30,40 @@ struct TencentAsrConfig {
     std::string engineType{"16k_zh"};
 };
 
+std::vector<std::filesystem::path> configCandidates()
+{
+    std::vector<std::filesystem::path> candidates{
+        std::filesystem::current_path() / "config" / "tencent_asr.local.json"
+    };
+#ifdef _WIN32
+    std::vector<wchar_t> executablePath(32768, L'\0');
+    const DWORD length = GetModuleFileNameW(
+        nullptr, executablePath.data(), static_cast<DWORD>(executablePath.size()));
+    if (length > 0 && length < executablePath.size()) {
+        const auto besideExecutable =
+            std::filesystem::path(executablePath.data()).parent_path() /
+            "config" / "tencent_asr.local.json";
+        if (besideExecutable != candidates.front()) {
+            candidates.push_back(besideExecutable);
+        }
+    }
+#endif
+    return candidates;
+}
+
 TencentAsrConfig loadConfig()
 {
-    const std::string path = "./config/tencent_asr.local.json";
-    std::ifstream input(path, std::ios::binary);
+    std::ifstream input;
+    for (const auto& candidate : configCandidates()) {
+        input.open(candidate, std::ios::binary);
+        if (input) {
+            break;
+        }
+        input.clear();
+    }
     if (!input) {
-        throw std::runtime_error("Tencent ASR config not found at " + path);
+        throw std::runtime_error(
+            "Tencent ASR config not found in the working or executable directory");
     }
     Json::CharReaderBuilder builder;
     Json::Value root;
