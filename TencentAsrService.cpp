@@ -255,7 +255,9 @@ void TencentAsrService::transcribe(
         request->addHeader("Authorization", authorization);
         request->addHeader("Accept", "application/json");
         request->addHeader("Accept-Encoding", "identity");
-        request->addHeader("Content-Length", std::to_string(audioData.size()));
+        // Drogon writes Content-Length automatically from the binary body.
+        // Adding it manually produces two Content-Length headers, which the
+        // Tencent nginx gateway rejects with HTTP 400 before ASR validation.
         request->setBody(std::move(audioData));
 
         auto client = drogon::HttpClient::newHttpClient("https://asr.cloud.tencent.com");

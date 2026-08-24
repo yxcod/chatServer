@@ -6,6 +6,8 @@
   signed query separator, which previously produced non-JSON gateway replies.
 - Added content-type-independent Tencent response parsing and safe HTTP/body
   diagnostics for failed transcription requests.
+- Removed a duplicate manual Content-Length header; Drogon already emits the
+  binary body length and nginx rejects duplicate values with HTTP 400.
 
 ## 2026-08-24 - Persistent quoted messages
 
