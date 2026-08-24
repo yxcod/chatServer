@@ -28,7 +28,6 @@ struct TencentAsrConfig {
     std::string secretId;
     std::string secretKey;
     std::string engineType{"16k_zh"};
-    std::filesystem::path sourcePath;
 };
 
 std::string trimWhitespace(std::string value)
@@ -39,19 +38,6 @@ std::string trimWhitespace(std::string value)
         [](unsigned char character) { return std::isspace(character) != 0; }).base();
     if (first >= last) return {};
     return std::string(first, last);
-}
-
-std::string credentialFingerprint(const std::string& value)
-{
-    unsigned char digest[SHA256_DIGEST_LENGTH]{};
-    SHA256(reinterpret_cast<const unsigned char*>(value.data()),
-        value.size(), digest);
-    std::ostringstream fingerprint;
-    fingerprint << std::hex << std::setfill('0');
-    for (std::size_t index = 0; index < 6; ++index) {
-        fingerprint << std::setw(2) << static_cast<unsigned int>(digest[index]);
-    }
-    return fingerprint.str();
 }
 
 std::vector<std::filesystem::path> configCandidates()
@@ -78,11 +64,9 @@ std::vector<std::filesystem::path> configCandidates()
 TencentAsrConfig loadConfig()
 {
     std::ifstream input;
-    std::filesystem::path sourcePath;
     for (const auto& candidate : configCandidates()) {
         input.open(candidate, std::ios::binary);
         if (input) {
-            sourcePath = candidate;
             break;
         }
         input.clear();
@@ -99,7 +83,6 @@ TencentAsrConfig loadConfig()
     }
 
     TencentAsrConfig config;
-    config.sourcePath = std::move(sourcePath);
     const Json::Value& appId = root.isMember("appId")
         ? root["appId"] : root["AppID"];
     if (appId.isString()) {
@@ -282,17 +265,6 @@ void TencentAsrService::transcribe(
         completion(false, std::move(result));
         return;
     }
-
-    LOG_INFO << "Tencent ASR config selected: path="
-             << config.sourcePath.u8string()
-             << ", appId=" << config.appId
-             << ", engineType=" << config.engineType
-             << ", secretIdLength=" << config.secretId.size()
-             << ", secretIdFingerprint="
-             << credentialFingerprint(config.secretId)
-             << ", secretKeyLength=" << config.secretKey.size()
-             << ", secretKeyFingerprint="
-             << credentialFingerprint(config.secretKey);
 
     std::string requestBody;
     std::string authorization;
