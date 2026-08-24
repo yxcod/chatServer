@@ -20,9 +20,9 @@ public:
 	std::string messageFailed(const Json::Value& jsonMsg, const std::string& reason);
 	//获取指定用户的所有未读记录
 	Json::Value getunReadMessage(const Json::Value& jsonMsg);
-	//获取指定会话的最近聊天记录
+	//获取当前用户在指定会话中仍可见的最近聊天记录
 	Json::Value getRecentChatRecords(const Json::Value& jsonMsg);
-	//删除私聊会话及其全部聊天记录
+	//单向隐藏私聊记录；双方删除的交集才从数据库物理删除
 	Json::Value deletePrivateChatHistory(const Json::Value& jsonMsg);
 	//处理视频通话请求
 	std::string handleVideoCallRequest(const Json::Value& jsonMsg);

@@ -1,5 +1,6 @@
 #include "ChatDao.h"
 #include "Logger.h"
+#include <algorithm>
 #include <stdexcept>
 
 std::vector<ConversationModel> ChatDao::getUserAllConversation(const std::string& userId) const
@@ -126,15 +127,96 @@ int ChatDao::deletePrivateChatHistory(
             }
         }
 
-        std::unique_ptr<sql::PreparedStatement> recordsStmt(con->prepareStatement(
-            "DELETE FROM chatrecord WHERE sessionId = ?"));
-        recordsStmt->setString(1, sessionId);
-        recordsStmt->executeUpdate();
+        uint64_t latestRecordId = 0;
+        std::unique_ptr<sql::PreparedStatement> latestStmt(con->prepareStatement(
+            "SELECT COALESCE(MAX(id), 0) AS latestRecordId "
+            "FROM chatrecord WHERE sessionId = ?"));
+        latestStmt->setString(1, sessionId);
+        std::unique_ptr<sql::ResultSet> latestResult(latestStmt->executeQuery());
+        if (latestResult->next())
+        {
+            latestRecordId = latestResult->getUInt64("latestRecordId");
+        }
 
-        std::unique_ptr<sql::PreparedStatement> conversationStmt(con->prepareStatement(
-            "DELETE FROM conversations WHERE convId = ?"));
-        conversationStmt->setString(1, sessionId);
-        conversationStmt->executeUpdate();
+        std::unique_ptr<sql::PreparedStatement> visibilityStmt(con->prepareStatement(
+            "INSERT INTO private_chat_history_visibility "
+            "(conversationId, userId, peerUserId, deletedThroughRecordId, updatedAt) "
+            "VALUES (?, ?, ?, ?, ?) "
+            "ON DUPLICATE KEY UPDATE "
+            "peerUserId = VALUES(peerUserId), "
+            "deletedThroughRecordId = GREATEST(deletedThroughRecordId, VALUES(deletedThroughRecordId)), "
+            "updatedAt = VALUES(updatedAt)"));
+        visibilityStmt->setString(1, sessionId);
+        visibilityStmt->setString(2, requesterId);
+        visibilityStmt->setString(3, peerId);
+        visibilityStmt->setUInt64(4, latestRecordId);
+        visibilityStmt->setUInt64(5, Logger::GetInstance().getcurrentTime());
+        visibilityStmt->executeUpdate();
+
+        uint64_t requesterDeletedThrough = latestRecordId;
+        uint64_t peerDeletedThrough = 0;
+        std::unique_ptr<sql::PreparedStatement> deletionStateStmt(con->prepareStatement(
+            "SELECT conversationId, userId, peerUserId, "
+            "deletedThroughRecordId, updatedAt "
+            "FROM private_chat_history_visibility "
+            "WHERE conversationId = ? AND userId IN (?, ?) FOR UPDATE"));
+        deletionStateStmt->setString(1, sessionId);
+        deletionStateStmt->setString(2, requesterId);
+        deletionStateStmt->setString(3, peerId);
+        std::unique_ptr<sql::ResultSet> deletionStateResult(
+            deletionStateStmt->executeQuery());
+        while (deletionStateResult->next())
+        {
+            PrivateChatHistoryVisibilityModel visibility;
+            visibility.setConversationId(
+                deletionStateResult->getString("conversationId"));
+            visibility.setUserId(deletionStateResult->getString("userId"));
+            visibility.setPeerUserId(deletionStateResult->getString("peerUserId"));
+            visibility.setDeletedThroughRecordId(
+                deletionStateResult->getUInt64("deletedThroughRecordId"));
+            visibility.setUpdatedAt(deletionStateResult->getUInt64("updatedAt"));
+            if (visibility.getUserId() == requesterId)
+                requesterDeletedThrough = visibility.getDeletedThroughRecordId();
+            else if (visibility.getUserId() == peerId)
+                peerDeletedThrough = visibility.getDeletedThroughRecordId();
+        }
+
+        std::unique_ptr<sql::PreparedStatement> hideConversationStmt(
+            con->prepareStatement(
+                "UPDATE conversations SET "
+                "user1isVaild = CASE WHEN user1Id = ? THEN 0 ELSE user1isVaild END, "
+                "user2isValid = CASE WHEN user2Id = ? THEN 0 ELSE user2isValid END, "
+                "user1UnreadCount = CASE WHEN user1Id = ? THEN 0 ELSE user1UnreadCount END, "
+                "user2UnreadCount = CASE WHEN user2Id = ? THEN 0 ELSE user2UnreadCount END "
+                "WHERE convId = ?"));
+        hideConversationStmt->setString(1, requesterId);
+        hideConversationStmt->setString(2, requesterId);
+        hideConversationStmt->setString(3, requesterId);
+        hideConversationStmt->setString(4, requesterId);
+        hideConversationStmt->setString(5, sessionId);
+        hideConversationStmt->executeUpdate();
+
+        const uint64_t purgeThrough =
+            std::min(requesterDeletedThrough, peerDeletedThrough);
+        if (purgeThrough > 0)
+        {
+            std::unique_ptr<sql::PreparedStatement> recordsStmt(
+                con->prepareStatement(
+                    "DELETE FROM chatrecord WHERE sessionId = ? AND id <= ?"));
+            recordsStmt->setString(1, sessionId);
+            recordsStmt->setUInt64(2, purgeThrough);
+            recordsStmt->executeUpdate();
+        }
+
+        std::unique_ptr<sql::PreparedStatement> clearEmptyConversationStmt(
+            con->prepareStatement(
+                "UPDATE conversations SET lastMsg = '', lastMsgId = '', "
+                "lastSenderId = '', user1UnreadCount = 0, user2UnreadCount = 0 "
+                "WHERE convId = ? AND NOT EXISTS "
+                "(SELECT 1 FROM chatrecord WHERE sessionId = ? LIMIT 1)"));
+        clearEmptyConversationStmt->setString(1, sessionId);
+        clearEmptyConversationStmt->setString(2, sessionId);
+        clearEmptyConversationStmt->executeUpdate();
 
         con->commit();
         con->setAutoCommit(true);
@@ -362,15 +444,21 @@ std::vector<ChatRecord> ChatDao::getUnreadMessage(const std::string& userName)
 {
     std::vector<ChatRecord> records;
 
-    std::string sql = "SELECT * FROM chatrecord WHERE msgStatus = ? and receiveId = ?";
+    std::string sql =
+        "SELECT r.* FROM chatrecord r "
+        "LEFT JOIN private_chat_history_visibility v "
+        "ON v.conversationId = r.sessionId AND v.userId = ? "
+        "WHERE r.msgStatus = ? AND r.receiveId = ? "
+        "AND r.id > COALESCE(v.deletedThroughRecordId, 0)";
 
     auto con = Logger::GetInstance().createConnection();
 
     try
     {
         std::unique_ptr<sql::PreparedStatement> pstmt(con->prepareStatement(sql));
-        pstmt->setInt(1, 1);
-        pstmt->setString(2, userName);
+        pstmt->setString(1, userName);
+        pstmt->setInt(2, 1);
+        pstmt->setString(3, userName);
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
         while (res->next())
@@ -609,69 +697,41 @@ int ChatDao::resetUnreadCountForUser(const std::string& convId, const std::strin
         return 0;
     }
 }
-std::vector<ChatRecord> ChatDao::getRecentChatRecordsBySessionId(const std::string& sessionId, int limit) const
+std::vector<ChatRecord> ChatDao::getRecentChatRecordsBySessionId(
+    const std::string& sessionId,
+    const std::string& requesterId,
+    int limit) const
 {
     std::vector<ChatRecord> records;
 
-    if (limit <= 0)
+    if (sessionId.empty() || requesterId.empty() || limit <= 0)
     {
         return records;
     }
 
-    // 每次调用都创建一个独立连接
     auto con = Logger::GetInstance().createConnection();
-
-    // 先查询该 sessionId 的总条数
-    int totalCount = 0;
-    try
-    {
-        std::string countSql = "SELECT COUNT(*) AS cnt FROM chatrecord WHERE sessionId = ?";
-        std::unique_ptr<sql::PreparedStatement> countStmt(
-            con->prepareStatement(countSql));
-        countStmt->setString(1, sessionId);
-
-        std::unique_ptr<sql::ResultSet> countRes(
-            countStmt->executeQuery());
-        if (countRes->next())
-        {
-            totalCount = countRes->getInt("cnt");
-        }
-    }
-    catch (...)
-    {
-        // 如果统计失败，则退化为直接按传入的 limit 查询
-        totalCount = 0;
-    }
-
-    // 实际要取的条数 = min(limit, totalCount)，
-    // 如果 totalCount == 0，说明这个会话本来就没有记录
-    int realLimit = limit;
-    if (totalCount > 0 && limit > totalCount)
-    {
-        realLimit = totalCount;
-    }
-
-    // 如果没有记录，直接返回空 vector
-    if (realLimit <= 0)
-    {
-        return records;
-    }
-
-    // 按 sendTime 降序取最近 realLimit 条
     std::string sql =
-        "SELECT id, msgId, sendUserId, receiveType, receiveId, msgType, msgContent, "
-        "       msgStatus, sendTime, readTime, extendInfo, sessionId "
-        "FROM chatrecord "
-        "WHERE sessionId = ? "
-        "ORDER BY sendTime DESC "
+        "SELECT r.id, r.msgId, r.sendUserId, r.receiveType, r.receiveId, "
+        "r.msgType, r.msgContent, r.msgStatus, r.sendTime, r.readTime, "
+        "r.extendInfo, r.sessionId "
+        "FROM chatrecord r "
+        "JOIN conversations c ON c.convId = r.sessionId "
+        "LEFT JOIN private_chat_history_visibility v "
+        "ON v.conversationId = r.sessionId AND v.userId = ? "
+        "WHERE r.sessionId = ? AND (c.user1Id = ? OR c.user2Id = ?) "
+        "AND r.id > COALESCE(v.deletedThroughRecordId, 0) "
+        "ORDER BY r.sendTime DESC, r.id DESC "
         "LIMIT ?";
 
     try
     {
         std::unique_ptr<sql::PreparedStatement> pstmt(
             con->prepareStatement(sql));
-        pstmt->setString(1, sessionId);
-        pstmt->setUInt(2, static_cast<unsigned int>(realLimit));
+        pstmt->setString(1, requesterId);
+        pstmt->setString(2, sessionId);
+        pstmt->setString(3, requesterId);
+        pstmt->setString(4, requesterId);
+        pstmt->setUInt(5, static_cast<unsigned int>(limit));
 
         std::unique_ptr<sql::ResultSet> res(
             pstmt->executeQuery());
@@ -715,7 +775,5 @@ std::vector<ChatRecord> ChatDao::getRecentChatRecordsBySessionId(const std::stri
         return records;
     }
 
-    // 这里函数结束时：
-    // res/pstmt/countRes/countStmt 先析构，再析构 con，连接自动关闭
     return records;
 }

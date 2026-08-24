@@ -34,7 +34,6 @@ public:
 	void getUnReadMessage(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback)
 	{
 		auto json = req->getJsonObject();
-		Logger::GetInstance().debugJson(*json);
 		Json::Value response_data;
 		if (!json || !json->isMember("userName")) {
 			response_data["code"] = 99;
@@ -49,13 +48,25 @@ public:
 	void getRecentChatRecords(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback)
 	{
 		auto json = req->getJsonObject();
-		Logger::GetInstance().debugJson(*json);
 		Json::Value response_data;
-		if (!json || !json->isMember("conversationId") || !json->isMember("limit")) {
+		if (!json || !json->isMember("conversationId") ||
+			!json->isMember("userName") || !json->isMember("limit")) {
 			response_data["code"] = 99;
 			callback(HttpResponse::newHttpJsonResponse(response_data));
 			return;
 		}
+		const auto authenticatedUser = getAuthenticatedUser(req);
+		if (!authenticatedUser ||
+			*authenticatedUser != (*json)["userName"].asString())
+		{
+			response_data["code"] = 401;
+			response_data["msg"] = "unauthorized";
+			auto response = HttpResponse::newHttpJsonResponse(response_data);
+			response->setStatusCode(k401Unauthorized);
+			callback(response);
+			return;
+		}
+		Logger::GetInstance().debugJson(*json);
 		ChatService chatService;
 		callback(HttpResponse::newHttpJsonResponse(chatService.getRecentChatRecords(*json)));
 	}

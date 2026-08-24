@@ -1,6 +1,7 @@
 #pragma once
 #include"ConversationModel.h"
 #include "ChatRecoedModel.h"
+#include "PrivateChatHistoryVisibilityModel.h"
 #include <string>
 #include <ctime>  
 #include <sstream>
@@ -38,7 +39,7 @@ public:
 	// 删除指定会话（sessionId）下的所有聊天记录，返回受影响行数
 	int deleteChatRecordsBetweenUsers(const std::string& sessionId) const;
 
-	// 原子删除私聊会话及其全部消息。仅当请求者和对方确为会话参与者时执行。
+	// 隐藏请求者当前可见的历史，并物理删除双方都已删除的消息交集。
 	// 1=成功（包含重复删除），-1=无权限或会话参与者不匹配，0=数据库错误。
 	int deletePrivateChatHistory(const std::string& sessionId,
 		const std::string& requesterId,
@@ -55,5 +56,8 @@ public:
 	// 如果 userName == user2Id，则将 user2UnreadCount 置为 0
 	int resetUnreadCountForUser(const std::string& convId, const std::string& userName) const;
 	// 获取指定会话 sessionId 下的最近 limit 条聊天记录，按发送时间降序排列
-	std::vector<ChatRecord> getRecentChatRecordsBySessionId(const std::string& sessionId, int limit) const;
+	std::vector<ChatRecord> getRecentChatRecordsBySessionId(
+		const std::string& sessionId,
+		const std::string& requesterId,
+		int limit) const;
 };

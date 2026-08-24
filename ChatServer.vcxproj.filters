@@ -113,6 +113,9 @@
     <ClInclude Include="ConversationModel.h">
       <Filter>源文件\Model</Filter>
     </ClInclude>
+    <ClInclude Include="PrivateChatHistoryVisibilityModel.h">
+      <Filter>源文件\Model</Filter>
+    </ClInclude>
     <ClInclude Include="ChatControl.h">
       <Filter>源文件\Control</Filter>
     </ClInclude>

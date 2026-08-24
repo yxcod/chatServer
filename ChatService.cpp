@@ -300,9 +300,11 @@ Json::Value ChatService::getRecentChatRecords(const Json::Value& jsonMsg)
 {
 	Json::Value result;
 	std::string sessionId = jsonMsg["conversationId"].asString();
+	std::string requesterId = jsonMsg["userName"].asString();
 	int limit = jsonMsg["limit"].asInt();
 	ChatDao dao;
-	auto convs = dao.getRecentChatRecordsBySessionId(sessionId, limit);
+	auto convs = dao.getRecentChatRecordsBySessionId(
+        sessionId, requesterId, limit);
     Json::Value arr(Json::arrayValue);
     for (const auto& c : convs) {
         Json::Value item;

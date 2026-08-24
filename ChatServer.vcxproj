@@ -188,6 +188,7 @@
     <ClInclude Include="ChatRecoedModel.h" />
     <ClInclude Include="ChatService.h" />
     <ClInclude Include="ConversationModel.h" />
+    <ClInclude Include="PrivateChatHistoryVisibilityModel.h" />
     <ClInclude Include="CrashHandler.h" />
     <ClInclude Include="DatabaseConnectionPool.h" />
     <ClInclude Include="EncryptUtil.h" />
