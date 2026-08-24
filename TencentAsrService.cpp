@@ -30,6 +30,16 @@ struct TencentAsrConfig {
     std::string engineType{"16k_zh"};
 };
 
+std::string trimWhitespace(std::string value)
+{
+    const auto first = std::find_if_not(value.begin(), value.end(),
+        [](unsigned char character) { return std::isspace(character) != 0; });
+    const auto last = std::find_if_not(value.rbegin(), value.rend(),
+        [](unsigned char character) { return std::isspace(character) != 0; }).base();
+    if (first >= last) return {};
+    return std::string(first, last);
+}
+
 std::vector<std::filesystem::path> configCandidates()
 {
     std::vector<std::filesystem::path> candidates{
@@ -92,6 +102,15 @@ TencentAsrConfig loadConfig()
     if (root["engineType"].isString() && !root["engineType"].asString().empty()) {
         config.engineType = root["engineType"].asString();
     }
+
+    // Values copied from a browser or edited in Notepad can contain invisible
+    // leading/trailing whitespace. Tencent includes SecretId and SecretKey in
+    // signature validation, so even one extra character makes the signature
+    // invalid and its gateway may answer with an HTML 404 response.
+    config.appId = trimWhitespace(std::move(config.appId));
+    config.secretId = trimWhitespace(std::move(config.secretId));
+    config.secretKey = trimWhitespace(std::move(config.secretKey));
+    config.engineType = trimWhitespace(std::move(config.engineType));
 
     const bool appIdIsNumeric = !config.appId.empty() &&
         std::all_of(config.appId.begin(), config.appId.end(), [](unsigned char value) {
@@ -182,8 +201,14 @@ TencentAsrResult parseResponse(const drogon::HttpResponsePtr& response)
     if (body.empty() || !reader->parse(
         body.data(), body.data() + body.size(), &json, &errors)) {
         result.providerCode = -1;
-        result.providerMessage = "Tencent ASR returned invalid JSON (HTTP " +
-            std::to_string(result.httpStatus) + ")";
+        if (result.httpStatus == 404) {
+            result.providerMessage =
+                "Tencent ASR gateway returned HTTP 404; verify the ASR "
+                "credentials and service activation";
+        } else {
+            result.providerMessage = "Tencent ASR returned invalid JSON (HTTP " +
+                std::to_string(result.httpStatus) + ")";
+        }
         return result;
     }
     result.providerCode = json["code"].asInt();
