@@ -26,7 +26,9 @@ Tencent Cloud voice transcription reads `config/tencent_asr.local.json` from
 the process working directory or beside `ChatServer.exe`. Copy
 `config/tencent_asr.example.json`, fill in `appId`, `secretId`, `secretKey`,
 and keep the local file out of Git. Run `sql/voice_transcription.sql` once
-before using `/api/audio/transcribe`.
+before using `/api/audio/transcribe`. Chat voice transcription uses Tencent
+Cloud `SentenceRecognition` (Cloud API 3.0), which accepts audio up to 60
+seconds and a Base64-encoded request body up to 3 MB.
 
 ## Build
 

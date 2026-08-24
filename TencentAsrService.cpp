@@ -7,7 +7,6 @@
 #include <fstream>
 #include <iomanip>
 #include <json/json.h>
-#include <map>
 #include <memory>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
@@ -141,52 +140,65 @@ TencentAsrConfig loadConfig()
     return config;
 }
 
-std::string percentEncode(const std::string& value)
+std::string hexEncode(const unsigned char* data, std::size_t length)
 {
     std::ostringstream encoded;
-    encoded << std::uppercase << std::hex;
-    for (const unsigned char character : value) {
-        if (std::isalnum(character) || character == '-' || character == '_' ||
-            character == '.' || character == '~') {
-            encoded << static_cast<char>(character);
-        } else {
-            encoded << '%' << std::setw(2) << std::setfill('0')
-                << static_cast<int>(character);
-        }
+    encoded << std::hex << std::setfill('0');
+    for (std::size_t index = 0; index < length; ++index) {
+        encoded << std::setw(2) << static_cast<unsigned int>(data[index]);
     }
     return encoded.str();
 }
 
-std::string makeQuery(const std::map<std::string, std::string>& parameters)
+std::string sha256Hex(const std::string& value)
 {
-    std::ostringstream query;
-    bool first = true;
-    for (const auto& parameter : parameters) {
-        if (!first) query << '&';
-        first = false;
-        query << percentEncode(parameter.first) << '=' << percentEncode(parameter.second);
-    }
-    return query.str();
+    unsigned char digest[SHA256_DIGEST_LENGTH]{};
+    SHA256(reinterpret_cast<const unsigned char*>(value.data()),
+        value.size(), digest);
+    return hexEncode(digest, SHA256_DIGEST_LENGTH);
 }
 
-std::string sign(const std::string& text, const std::string& secretKey)
+std::string hmacSha256(const std::string& key, const std::string& value)
 {
     unsigned int digestLength = EVP_MAX_MD_SIZE;
     unsigned char digest[EVP_MAX_MD_SIZE]{};
-    if (HMAC(EVP_sha1(), secretKey.data(), static_cast<int>(secretKey.size()),
-        reinterpret_cast<const unsigned char*>(text.data()), text.size(),
+    if (HMAC(EVP_sha256(), key.data(), static_cast<int>(key.size()),
+        reinterpret_cast<const unsigned char*>(value.data()), value.size(),
         digest, &digestLength) == nullptr) {
-        throw std::runtime_error("Failed to sign Tencent ASR request");
+        throw std::runtime_error("Failed to create Tencent ASR signature");
     }
+    return std::string(reinterpret_cast<const char*>(digest), digestLength);
+}
 
-    std::string base64(((digestLength + 2) / 3) * 4, '\0');
+std::string base64Encode(const std::string& value)
+{
+    std::string base64(((value.size() + 2) / 3) * 4, '\0');
     const int encodedLength = EVP_EncodeBlock(
-        reinterpret_cast<unsigned char*>(base64.data()), digest, digestLength);
+        reinterpret_cast<unsigned char*>(base64.data()),
+        reinterpret_cast<const unsigned char*>(value.data()),
+        static_cast<int>(value.size()));
     if (encodedLength <= 0) {
-        throw std::runtime_error("Failed to encode Tencent ASR signature");
+        throw std::runtime_error("Failed to encode Tencent ASR audio");
     }
     base64.resize(static_cast<std::size_t>(encodedLength));
     return base64;
+}
+
+std::string utcDate(std::time_t timestamp)
+{
+    std::tm utc{};
+#ifdef _WIN32
+    if (gmtime_s(&utc, &timestamp) != 0) {
+        throw std::runtime_error("Failed to create Tencent ASR timestamp");
+    }
+#else
+    if (gmtime_r(&timestamp, &utc) == nullptr) {
+        throw std::runtime_error("Failed to create Tencent ASR timestamp");
+    }
+#endif
+    std::ostringstream date;
+    date << std::put_time(&utc, "%Y-%m-%d");
+    return date.str();
 }
 
 TencentAsrResult parseResponse(const drogon::HttpResponsePtr& response)
@@ -229,14 +241,28 @@ TencentAsrResult parseResponse(const drogon::HttpResponsePtr& response)
         }
         return result;
     }
+    if (json["Response"].isObject()) {
+        const auto& providerResponse = json["Response"];
+        result.requestId = providerResponse["RequestId"].asString();
+        if (providerResponse["Error"].isObject()) {
+            result.providerCode = -1;
+            const auto& error = providerResponse["Error"];
+            result.providerMessage = error["Code"].asString();
+            if (!error["Message"].asString().empty()) {
+                result.providerMessage += ": " + error["Message"].asString();
+            }
+            return result;
+        }
+        result.providerCode = 0;
+        result.transcript = providerResponse["Result"].asString();
+        result.audioDurationMs = providerResponse["AudioDuration"].asUInt();
+        return result;
+    }
+
     result.providerCode = json["code"].asInt();
     result.providerMessage = json["message"].asString();
     result.requestId = json["request_id"].asString();
     result.audioDurationMs = json["audio_duration"].asUInt();
-    const auto& flashResult = json["flash_result"];
-    if (flashResult.isArray() && !flashResult.empty()) {
-        result.transcript = flashResult[0]["text"].asString();
-    }
     return result;
 }
 }
@@ -268,26 +294,61 @@ void TencentAsrService::transcribe(
              << ", secretKeyFingerprint="
              << credentialFingerprint(config.secretKey);
 
-    const std::map<std::string, std::string> parameters{
-        {"convert_num_mode", "1"},
-        {"engine_type", config.engineType},
-        {"filter_dirty", "0"},
-        {"filter_modal", "0"},
-        {"filter_punc", "0"},
-        {"first_channel_only", "1"},
-        {"secretid", config.secretId},
-        {"speaker_diarization", "0"},
-        {"timestamp", std::to_string(static_cast<long long>(std::time(nullptr)))},
-        {"voice_format", voiceFormat},
-        {"word_info", "0"}
-    };
-    const std::string query = makeQuery(parameters);
-    const std::string basePath = "/asr/flash/v1/" + config.appId;
-    const std::string path = basePath + "?" + query;
-
+    std::string requestBody;
     std::string authorization;
+    std::string timestampText;
     try {
-        authorization = sign("POSTasr.cloud.tencent.com" + path, config.secretKey);
+        const std::string encodedAudio = base64Encode(audioData);
+        constexpr std::size_t kMaximumEncodedAudioSize = 3ULL * 1024 * 1024;
+        if (encodedAudio.size() > kMaximumEncodedAudioSize) {
+            throw std::runtime_error(
+                "Tencent sentence recognition audio exceeds the 3MB limit");
+        }
+
+        Json::Value payload;
+        payload["EngSerViceType"] = config.engineType;
+        payload["SourceType"] = 1;
+        payload["VoiceFormat"] = voiceFormat;
+        payload["Data"] = encodedAudio;
+        payload["DataLen"] = static_cast<Json::UInt64>(audioData.size());
+        payload["SubServiceType"] = 2;
+        payload["ProjectId"] = 0;
+        payload["WordInfo"] = 0;
+        payload["FilterDirty"] = 0;
+        payload["FilterModal"] = 0;
+        payload["FilterPunc"] = 0;
+        payload["ConvertNumMode"] = 1;
+        Json::StreamWriterBuilder writer;
+        writer["indentation"] = "";
+        requestBody = Json::writeString(writer, payload);
+
+        const auto timestamp = std::time(nullptr);
+        timestampText = std::to_string(static_cast<long long>(timestamp));
+        const std::string date = utcDate(timestamp);
+        const std::string canonicalHeaders =
+            "content-type:application/json; charset=utf-8\n"
+            "host:asr.tencentcloudapi.com\n";
+        const std::string signedHeaders = "content-type;host";
+        const std::string canonicalRequest =
+            "POST\n/\n\n" + canonicalHeaders + "\n" + signedHeaders +
+            "\n" + sha256Hex(requestBody);
+        const std::string credentialScope = date + "/asr/tc3_request";
+        const std::string stringToSign =
+            "TC3-HMAC-SHA256\n" + timestampText + "\n" +
+            credentialScope + "\n" + sha256Hex(canonicalRequest);
+        const std::string secretDate = hmacSha256("TC3" + config.secretKey, date);
+        const std::string secretService = hmacSha256(secretDate, "asr");
+        const std::string secretSigning =
+            hmacSha256(secretService, "tc3_request");
+        const std::string signatureBytes =
+            hmacSha256(secretSigning, stringToSign);
+        const std::string signature = hexEncode(
+            reinterpret_cast<const unsigned char*>(signatureBytes.data()),
+            signatureBytes.size());
+        authorization =
+            "TC3-HMAC-SHA256 Credential=" + config.secretId + "/" +
+            credentialScope + ", SignedHeaders=" + signedHeaders +
+            ", Signature=" + signature;
     } catch (const std::exception& error) {
         TencentAsrResult result;
         result.providerCode = -1;
@@ -299,22 +360,20 @@ void TencentAsrService::transcribe(
     try {
         auto request = drogon::HttpRequest::newHttpRequest();
         request->setMethod(drogon::Post);
-        // Drogon encodes setPath() by default. Encoding the '?' turns the
-        // signed query into part of the path and Tencent responds with an
-        // HTML gateway/404 body instead of its documented JSON payload.
-        request->setPathEncode(false);
-        request->setPath(path);
-        request->setContentTypeCode(drogon::CT_APPLICATION_OCTET_STREAM);
-        request->addHeader("Host", "asr.cloud.tencent.com");
+        request->setPath("/");
+        request->setContentTypeString("application/json; charset=utf-8");
+        request->addHeader("Host", "asr.tencentcloudapi.com");
         request->addHeader("Authorization", authorization);
         request->addHeader("Accept", "application/json");
         request->addHeader("Accept-Encoding", "identity");
-        // Drogon writes Content-Length automatically from the binary body.
-        // Adding it manually produces two Content-Length headers, which the
-        // Tencent nginx gateway rejects with HTTP 400 before ASR validation.
-        request->setBody(std::move(audioData));
+        request->addHeader("X-TC-Action", "SentenceRecognition");
+        request->addHeader("X-TC-Timestamp", timestampText);
+        request->addHeader("X-TC-Version", "2019-06-14");
+        request->addHeader("X-TC-Region", "ap-shanghai");
+        request->setBody(std::move(requestBody));
 
-        auto client = drogon::HttpClient::newHttpClient("https://asr.cloud.tencent.com");
+        auto client = drogon::HttpClient::newHttpClient(
+            "https://asr.tencentcloudapi.com");
         client->sendRequest(request,
             [client, completion = std::move(completion)](
                 drogon::ReqResult requestResult,
