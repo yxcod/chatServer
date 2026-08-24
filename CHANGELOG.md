@@ -20,6 +20,10 @@ All notable project changes are documented in this file.
 
 ### Fixed
 
+- Fixed the MSVC build failure in private chat history deletion caused by the
+  Windows `min` macro expanding the qualified `std::min` call.
+- Enabled UTF-8 compilation for `ChatDao.cpp` so Chinese comments and existing
+  Unicode text no longer corrupt function parsing under Windows code page 936.
 - Added the MSVC `/FS` compiler option to every build configuration, preventing
   parallel compiler processes from failing with C1041 while writing `vc143.pdb`.
 

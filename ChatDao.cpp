@@ -69,6 +69,7 @@ int ChatDao::deleteConversationByConvId(const std::string& convId) const
     }
 }
 
+// 隐藏请求者当前可见的私聊历史，并在双方都删除后清理共同不可见的物理消息。
 int ChatDao::deletePrivateChatHistory(
     const std::string& sessionId,
     const std::string& requesterId,
@@ -196,8 +197,9 @@ int ChatDao::deletePrivateChatHistory(
         hideConversationStmt->setString(5, sessionId);
         hideConversationStmt->executeUpdate();
 
+        // 使用括号包裹 std::min，避免 Windows 头文件中的 min 宏错误展开。
         const uint64_t purgeThrough =
-            std::min(requesterDeletedThrough, peerDeletedThrough);
+            (std::min)(requesterDeletedThrough, peerDeletedThrough);
         if (purgeThrough > 0)
         {
             std::unique_ptr<sql::PreparedStatement> recordsStmt(
