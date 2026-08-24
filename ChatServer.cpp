@@ -11,6 +11,7 @@
 #include "MomentController.h"
 #include "GroupResourceController.h"
 #include "UserLocationController.h"
+#include "VoiceTranscriptionController.h"
 #include <cstdlib>
 using namespace drogon;
 

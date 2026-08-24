@@ -22,6 +22,11 @@ Optional database pool settings:
 
 See `.env.example` for local development placeholders. Never commit real credentials.
 
+Tencent Cloud voice transcription reads `config/tencent_asr.local.json` from
+the process working directory. Copy `config/tencent_asr.example.json`, fill in
+`appId`, `secretId`, `secretKey`, and keep the local file out of Git. Run
+`sql/voice_transcription.sql` once before using `/api/audio/transcribe`.
+
 ## Build
 
 Open `ChatServer.sln` with Visual Studio 2022 and build the x64 configuration. The project currently expects Boost 1.86 at `C:\boost_1_86_0`.

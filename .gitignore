@@ -33,7 +33,8 @@ config.json
 
 # Bare-repository metadata left in the source directory
 /HEAD
-/config
+/config/*
+!/config/tencent_asr.example.json
 /description
 /hooks/
 /info/

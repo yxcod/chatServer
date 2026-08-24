@@ -176,6 +176,10 @@
     <ClInclude Include="CrashHandler.h">
       <Filter>源文件\Tool</Filter>
     </ClInclude>
+    <ClInclude Include="TencentAsrService.h"><Filter>源文件\Service</Filter></ClInclude>
+    <ClInclude Include="VoiceTranscriptionController.h"><Filter>源文件\Control</Filter></ClInclude>
+    <ClInclude Include="VoiceTranscriptionDao.h"><Filter>源文件\Mapper</Filter></ClInclude>
+    <ClInclude Include="VoiceTranscriptionModel.h"><Filter>源文件\Model</Filter></ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="LoginDao.cpp">
@@ -274,5 +278,8 @@
     <ClCompile Include="GroupConversationDao.cpp">
       <Filter>源文件\Mapper</Filter>
     </ClCompile>
+    <ClCompile Include="TencentAsrService.cpp"><Filter>源文件\Service</Filter></ClCompile>
+    <ClCompile Include="VoiceTranscriptionController.cpp"><Filter>源文件\Control</Filter></ClCompile>
+    <ClCompile Include="VoiceTranscriptionDao.cpp"><Filter>源文件\Mapper</Filter></ClCompile>
   </ItemGroup>
 </Project>

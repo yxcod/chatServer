@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-08-24 - Tencent Cloud voice transcription
+
+- Added authenticated `/api/audio/transcribe` support for M4A/AAC chat audio.
+- Added Tencent Cloud Flash ASR signing and HTTPS integration using a Git-ignored local config.
+- Added the `voiceTranscription` model, DAO, SQL schema, and content-hash cache to avoid repeated recognition calls.
+
 All notable project changes are documented in this file.
 
 ## [Unreleased]

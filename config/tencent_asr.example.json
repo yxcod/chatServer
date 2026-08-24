@@ -1,0 +1,6 @@
+{
+  "appId": "your-tencent-cloud-app-id",
+  "secretId": "your-secret-id",
+  "secretKey": "your-secret-key",
+  "engineType": "16k_zh"
+}
