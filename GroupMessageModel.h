@@ -13,6 +13,7 @@ public:
                       std::string senderId,
                       uint8_t msgType,
                       std::string msgContent,
+                      std::string extendInfo,
                       uint64_t fileSize,
                       uint64_t sendTime,
                       uint8_t isDeleted,
@@ -22,6 +23,7 @@ public:
           senderId(std::move(senderId)),
           msgType(msgType),
           msgContent(std::move(msgContent)),
+          extendInfo(std::move(extendInfo)),
           fileSize(fileSize),
           sendTime(sendTime),
           isDeleted(isDeleted),
@@ -38,8 +40,9 @@ public:
     const std::string& getSenderId() const noexcept { return senderId; }
     uint8_t getMsgType() const noexcept { return msgType; }
     const std::string& getMsgContent() const noexcept { return msgContent; }
+    const std::string& getExtendInfo() const noexcept { return extendInfo; }
     uint64_t getFileSize() const noexcept { return fileSize; }
-    uint64_t getSendTime() const noexcept { return sendTime; }  // Ê±¼ä´Á
+    uint64_t getSendTime() const noexcept { return sendTime; }  // æ—¶é—´æˆ³
     uint8_t getIsDeleted() const noexcept { return isDeleted; }
     uint8_t getIsRead() const noexcept { return isRead; }
 
@@ -48,8 +51,9 @@ public:
     void setSenderId(const std::string& v) { senderId = v; }
     void setMsgType(uint8_t v) { msgType = v; }
     void setMsgContent(const std::string& v) { msgContent = v; }
+    void setExtendInfo(const std::string& v) { extendInfo = v; }
     void setFileSize(uint64_t v) { fileSize = v; }
-    void setSendTime(uint64_t v) { sendTime = v; }              // Ê±¼ä´Á
+    void setSendTime(uint64_t v) { sendTime = v; }              // æ—¶é—´æˆ³
     void setIsDeleted(uint8_t v) { isDeleted = v; }
     void setIsRead(uint8_t v) { isRead = v; }
 
@@ -62,6 +66,7 @@ public:
         os << "senderId=" << senderId << ", ";
         os << "msgType=" << static_cast<int>(msgType) << ", ";
         os << "msgContent=" << msgContent << ", ";
+        os << "extendInfo=" << extendInfo << ", ";
         os << "fileSize=" << fileSize << ", ";
         os << "sendTime=" << sendTime << ", ";
         os << "isDeleted=" << static_cast<int>(isDeleted) << ", ";
@@ -76,8 +81,9 @@ private:
     std::string senderId;
     uint8_t msgType = 0;
     std::string msgContent;
+    std::string extendInfo{"{}"};
     uint64_t fileSize = 0;
-    uint64_t sendTime = 0;   // Ê±¼ä´Á
+    uint64_t sendTime = 0;   // æ—¶é—´æˆ³
     uint8_t isDeleted = 0;
     uint8_t isRead = 0;
 };

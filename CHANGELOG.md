@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-08-24 - Persistent quoted messages
+
+- Added `extendInfo` persistence for group messages so quoted-message metadata survives history reloads.
+- Included private and group message extension data in history API responses.
+
 ## 2026-08-24 - Tencent Cloud voice transcription
 
 - Added authenticated `/api/audio/transcribe` support for M4A/AAC chat audio.

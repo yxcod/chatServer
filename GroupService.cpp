@@ -166,6 +166,7 @@ Json::Value GroupService::getGroupChatRecord(const Json::Value& groupInfo)
 		msgJson["senderId"] = m.getSenderId();
 		msgJson["msgType"] = static_cast<int>(m.getMsgType());
 		msgJson["msgContent"] = m.getMsgContent();
+		msgJson["extendInfo"] = m.getExtendInfo();
 		msgJson["fileSize"] = Json::UInt64(m.getFileSize());
 		msgJson["sendTime"] = Json::UInt64(m.getSendTime());
 		msgJson["isDeleted"] = static_cast<int>(m.getIsDeleted());
@@ -747,6 +748,7 @@ Json::Value GroupService::handleGroupMessage(const Json::Value& jsonMsg)
 	msg.setIsDeleted(0);
 	msg.setIsRead(0);
 	msg.setMsgContent(content);
+	msg.setExtendInfo(jsonMsg.get("extendInfo", "{}").asString());
 	msg.setMsgType(static_cast<uint8_t>(msgType));
 	msg.setSenderId(sender);
 	const uint64_t serverTime = Logger::GetInstance().getcurrentTime();

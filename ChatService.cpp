@@ -288,6 +288,7 @@ Json::Value ChatService::getunReadMessage(const Json::Value& jsonMsg)
         item["messageType"] = toClientMessageType(static_cast<int>(c.getMsgType()));
         item["messageStatus"] = (int)c.getMsgStatus();
         item["conversationId"] = c.getSessionId();
+        item["extendInfo"] = c.getExtendInfo();
 
         arr.append(item);
     }
@@ -316,6 +317,7 @@ Json::Value ChatService::getRecentChatRecords(const Json::Value& jsonMsg)
         item["messageType"] = toClientMessageType(static_cast<int>(c.getMsgType()));
         item["messageStatus"] = (int)c.getMsgStatus();
         item["conversationId"] = c.getSessionId();
+        item["extendInfo"] = c.getExtendInfo();
 
         arr.append(item);
     }

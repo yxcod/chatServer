@@ -156,11 +156,15 @@
     <ClCompile Include="GroupChatDao.cpp" />
     <ClCompile Include="GroupConversationDao.cpp" />
     <ClCompile Include="GroupMemberDao.cpp" />
-    <ClCompile Include="GroupMessageDao.cpp" />
+    <ClCompile Include="GroupMessageDao.cpp">
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="GroupMsgReadDao.cpp" />
     <ClCompile Include="GroupResourceController.cpp" />
     <ClCompile Include="GroupResourceDao.cpp" />
-    <ClCompile Include="GroupService.cpp" />
+    <ClCompile Include="GroupService.cpp">
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="HeartbeatManager.cpp" />
     <ClCompile Include="JwtTokenUtil.cpp">
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>

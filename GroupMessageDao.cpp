@@ -16,16 +16,17 @@ bool GroupMessageDao::insertMessageBundle(
         std::unique_ptr<sql::PreparedStatement> messageStmt(
             con->prepareStatement(
                 "INSERT INTO groupMessage "
-                "(groupId, senderId, msgType, msgContent, fileSize, sendTime, isDeleted, isRead) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"));
+                "(groupId, senderId, msgType, msgContent, extendInfo, fileSize, sendTime, isDeleted, isRead) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"));
         messageStmt->setUInt64(1, msg.getGroupId());
         messageStmt->setString(2, msg.getSenderId());
         messageStmt->setUInt(3, msg.getMsgType());
         messageStmt->setString(4, msg.getMsgContent());
-        messageStmt->setUInt64(5, msg.getFileSize());
-        messageStmt->setUInt64(6, msg.getSendTime());
-        messageStmt->setUInt(7, msg.getIsDeleted());
-        messageStmt->setUInt(8, msg.getIsRead());
+        messageStmt->setString(5, msg.getExtendInfo());
+        messageStmt->setUInt64(6, msg.getFileSize());
+        messageStmt->setUInt64(7, msg.getSendTime());
+        messageStmt->setUInt(8, msg.getIsDeleted());
+        messageStmt->setUInt(9, msg.getIsRead());
         if (messageStmt->executeUpdate() <= 0)
         {
             throw std::runtime_error("failed to insert group message");
@@ -100,18 +101,19 @@ uint64_t GroupMessageDao::insertMessage(GroupMessageModel &msg)
         std::unique_ptr<sql::PreparedStatement> pstmt(
             con->prepareStatement(
                 "INSERT INTO groupMessage "
-                "(groupId, senderId, msgType, msgContent, fileSize, sendTime, "
+                "(groupId, senderId, msgType, msgContent, extendInfo, fileSize, sendTime, "
                 "isDeleted, isRead) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"));
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"));
 
         pstmt->setUInt64(1, msg.getGroupId());
         pstmt->setString(2, msg.getSenderId());
         pstmt->setUInt(3, msg.getMsgType());
         pstmt->setString(4, msg.getMsgContent());
-        pstmt->setUInt64(5, msg.getFileSize());
-        pstmt->setUInt64(6, msg.getSendTime());     // 时间戳
-        pstmt->setUInt(7, msg.getIsDeleted());
-        pstmt->setUInt(8, msg.getIsRead());
+        pstmt->setString(5, msg.getExtendInfo());
+        pstmt->setUInt64(6, msg.getFileSize());
+        pstmt->setUInt64(7, msg.getSendTime());     // 时间戳
+        pstmt->setUInt(8, msg.getIsDeleted());
+        pstmt->setUInt(9, msg.getIsRead());
 
         pstmt->executeUpdate();
 
@@ -139,9 +141,9 @@ std::vector<GroupMessageModel> GroupMessageDao::getRecentMessages(uint64_t group
     {
         auto con = Logger::GetInstance().createConnection();
         std::ostringstream sql;
-        sql << "SELECT msgId, groupId, senderId, msgType, msgContent, "
+        sql << "SELECT msgId, groupId, senderId, msgType, msgContent, extendInfo, "
             << "fileSize, sendTime, isDeleted, isRead FROM ("
-            << "SELECT msgId, groupId, senderId, msgType, msgContent, "
+            << "SELECT msgId, groupId, senderId, msgType, msgContent, extendInfo, "
             << "fileSize, sendTime, isDeleted, isRead "
             << "FROM groupMessage WHERE groupId = ? "
             << "ORDER BY sendTime DESC, msgId DESC LIMIT " << limit
@@ -160,6 +162,7 @@ std::vector<GroupMessageModel> GroupMessageDao::getRecentMessages(uint64_t group
             m.setSenderId(res->getString("senderId"));
             m.setMsgType(static_cast<uint8_t>(res->getUInt("msgType")));
             m.setMsgContent(res->getString("msgContent"));
+            m.setExtendInfo(res->getString("extendInfo"));
             m.setFileSize(res->getUInt64("fileSize"));
             m.setSendTime(res->getUInt64("sendTime"));  // 时间戳
             m.setIsDeleted(static_cast<uint8_t>(res->getUInt("isDeleted")));
@@ -184,7 +187,7 @@ std::vector<GroupMessageModel> GroupMessageDao::getMessagesByTime(uint64_t group
         auto con = Logger::GetInstance().createConnection();
         std::unique_ptr<sql::PreparedStatement> pstmt(
             con->prepareStatement(
-                "SELECT msgId, groupId, senderId, msgType, msgContent, "
+                "SELECT msgId, groupId, senderId, msgType, msgContent, extendInfo, "
                 "fileSize, sendTime, isDeleted, isRead "
                 "FROM groupMessage "
                 "WHERE groupId = ? AND sendTime BETWEEN ? AND ? "
@@ -203,6 +206,7 @@ std::vector<GroupMessageModel> GroupMessageDao::getMessagesByTime(uint64_t group
             m.setSenderId(res->getString("senderId"));      // 改为 string
             m.setMsgType(static_cast<uint8_t>(res->getUInt("msgType")));
             m.setMsgContent(res->getString("msgContent"));
+            m.setExtendInfo(res->getString("extendInfo"));
             m.setFileSize(res->getUInt64("fileSize"));
             m.setSendTime(res->getUInt64("sendTime"));
             m.setIsDeleted(static_cast<uint8_t>(res->getUInt("isDeleted")));
@@ -228,7 +232,7 @@ std::vector<GroupMessageModel> GroupMessageDao::getUnreadMessagesByUserInGroup(c
         std::unique_ptr<sql::PreparedStatement> pstmt(
             con->prepareStatement(
                 "SELECT gm.msgId, gm.groupId, gm.senderId, gm.msgType, "
-                "gm.msgContent, gm.fileSize, "
+                "gm.msgContent, gm.extendInfo, gm.fileSize, "
                 "gm.sendTime AS sendTime, "
                 "gm.isDeleted, gm.isRead "
                 "FROM groupMsgRead gr "
@@ -250,6 +254,7 @@ std::vector<GroupMessageModel> GroupMessageDao::getUnreadMessagesByUserInGroup(c
             m.setSenderId(res->getString("senderId"));
             m.setMsgType(static_cast<uint8_t>(res->getUInt("msgType")));
             m.setMsgContent(res->getString("msgContent"));
+            m.setExtendInfo(res->getString("extendInfo"));
             m.setFileSize(res->getUInt64("fileSize"));
             m.setSendTime(res->getUInt64("sendTime"));   // 时间戳
             m.setIsDeleted(static_cast<uint8_t>(res->getUInt("isDeleted")));
