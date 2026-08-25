@@ -6,6 +6,18 @@
 #include "LoginDao.h"
 #include "UserInfoDao.h"
 
+namespace
+{
+// Universal character names keep these UTF-8 defaults independent of the
+// source file's Windows code page.
+constexpr const char* kDefaultNicknamePrefix =
+    u8"\u9ED8\u8BA4\u6635\u79F0";
+constexpr const char* kDefaultSignature =
+    u8"\u9ED8\u8BA4\u7B7E\u540D";
+constexpr const char* kDefaultRegion =
+    u8"\u4E2D\u56FD\u5317\u4EAC";
+}
+
 // 初始化密码加密工具和 JWT 工具；JWT 密钥当前按项目要求固定在代码中。
 UserLoginService::UserLoginService()
 {
@@ -32,13 +44,16 @@ Json::Value UserLoginService::registerUser(const std::string& account, const std
 			UserInfo userInfo;
 			UserInfoDao userInfoDao;
 			userInfo.setUserAccount(account);
-			//灏介噺涓嶈鍦ㄤ唬鐮佷腑濉啓涓枃杩欐牱鎻掑叆鏁版嵁搴撲細鍥犱负缂栫爜闂瀵艰嚧鏁版嵁搴撴彃鍏ュけ璐?濡傛灉闈炶鍦╒Scode閲岄潰鏇存敼璇峰皢鏂囦欢缂栫爜鏀逛负UTF-8 
-			std::string nickName = "榛樿鏄电О" + account.substr(0, 5);
+			std::string nickName =
+				std::string(kDefaultNicknamePrefix) + account.substr(0, 5);
 			userInfo.setNickName(nickName);
 			userInfo.setAvatar("init");
-			userInfo.setCreateTime(Logger::GetInstance().getcurrentTime());
+			const auto currentTime = Logger::GetInstance().getcurrentTime();
+			userInfo.setCreateTime(currentTime);
+			userInfo.setModifyTime(currentTime);
 			userInfo.setGender(1);
-			userInfo.setSignature("榛樿绛惧悕");
+			userInfo.setRegion(kDefaultRegion);
+			userInfo.setSignature(kDefaultSignature);
 			userInfo.setState(1);
 			if (userInfoDao.insertUserInfo(userInfo) > 0)
 			{
@@ -144,5 +159,3 @@ Json::Value UserLoginService::changePassword(const std::string& account,
 
 	return returnJson;
 }
-
-
