@@ -15,6 +15,7 @@ public:
 	ADD_METHOD_TO(UserController::login, "/api/user/login", Post);
 	ADD_METHOD_TO(UserController::getUserInfo, "/api/user/userInfo", Post);
 	ADD_METHOD_TO(UserController::userPasswordChange, "/api/user/passwordModify", Post);
+	ADD_METHOD_TO(UserController::userPasswordReset, "/api/user/passwordReset", Post);
 	ADD_METHOD_TO(UserController::userInfoChange, "/api/user/userInfoModify", Post);
 	METHOD_LIST_END
 	// 用户注册
@@ -107,6 +108,28 @@ public:
 		std::string newPassword = (*json)["newPassword"].asString();
 		UserLoginService login;
 		callback(HttpResponse::newHttpJsonResponse(login.changePassword(userAccount, oldPassword, newPassword)));
+	}
+	// 忘记密码重置。安全码按照产品需求仅由前端校验，此接口只接收重置结果。
+	void userPasswordReset(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) {
+		auto json = req->getJsonObject();
+		Json::Value responseData;
+		if (!json || !json->isMember("userName") || !json->isMember("newPassword")) {
+			responseData["code"] = 99;
+			callback(HttpResponse::newHttpJsonResponse(responseData));
+			return;
+		}
+
+		const std::string userAccount = (*json)["userName"].asString();
+		const std::string newPassword = (*json)["newPassword"].asString();
+		if (userAccount.empty() || newPassword.length() < 6) {
+			responseData["code"] = 99;
+			callback(HttpResponse::newHttpJsonResponse(responseData));
+			return;
+		}
+
+		UserLoginService login;
+		callback(HttpResponse::newHttpJsonResponse(
+			login.resetPassword(userAccount, newPassword)));
 	}
 	//修改个人信息
 	void userInfoChange(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) {

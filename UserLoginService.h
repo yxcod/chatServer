@@ -5,19 +5,21 @@
 #include <filesystem>
 class UserLoginService {
 public:
-	// ¹¹Ôìº¯Êı£º×¢Èë DAO ²ãºÍ¹¤¾ßÀà£¨ÒÀÀµ×¢Èë£¬±ãÓÚ²âÊÔºÍÀ©Õ¹£©
+	// æ„é€ å‡½æ•°ï¼šæ³¨å…¥ DAO å±‚å’Œå·¥å…·ç±»ï¼ˆä¾èµ–æ³¨å…¥ï¼Œä¾¿äºæµ‹è¯•å’Œæ‰©å±•ï¼‰
 	UserLoginService();
 
-	// Îö¹¹º¯Êı£¨Ä¬ÈÏ£©
+	// ææ„å‡½æ•°ï¼ˆé»˜è®¤ï¼‰
 	~UserLoginService() = default;
-	//×¢²á
+	//æ³¨å†Œ
 	Json::Value registerUser(const std::string& account, const std::string& password);
-	//µÇÂ¼
+	//ç™»å½•
 	Json::Value login(const std::string& account,const std::string& password);
-	//ĞŞ¸ÄÃÜÂë
+	//ä¿®æ”¹å¯†ç 
 	Json::Value changePassword(const std::string& account, const std::string& oldPassword, const std::string& newPassword);
-	// ÔÚµ±Ç°Â·¾¶ÏÂµÄ imageData / videoData / fileData Ä¿Â¼ÖĞ£¬
-// Îª´«ÈëµÄ name ´´½¨¶ÔÓ¦×ÓÄ¿Â¼£¨²»´æÔÚÔò×Ô¶¯´´½¨£©
+	// å¿˜è®°å¯†ç ï¼šå‰ç«¯å®Œæˆå®‰å…¨ç æ ¡éªŒåé‡ç½®å¯†ç 
+	Json::Value resetPassword(const std::string& account, const std::string& newPassword);
+	// åœ¨å½“å‰è·¯å¾„ä¸‹çš„ imageData / videoData / fileData ç›®å½•ä¸­ï¼Œ
+	// ä¸ºä¼ å…¥çš„ name åˆ›å»ºå¯¹åº”å­ç›®å½•ï¼ˆä¸å­˜åœ¨åˆ™è‡ªåŠ¨åˆ›å»ºï¼‰
 	void createUserDataDirectories(const std::string& name) const;
 
 private:

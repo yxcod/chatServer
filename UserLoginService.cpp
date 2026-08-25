@@ -159,3 +159,28 @@ Json::Value UserLoginService::changePassword(const std::string& account,
 
 	return returnJson;
 }
+
+Json::Value UserLoginService::resetPassword(
+	const std::string& account,
+	const std::string& newPassword)
+{
+	LoginDao loginDao;
+	Json::Value returnJson;
+	returnJson["code"] = 101;
+
+	const LoginInfo info = loginDao.loginAccount(account);
+	if (!info.found)
+	{
+		returnJson["code"] = 102;
+		return returnJson;
+	}
+
+	const std::string encryptedPassword =
+		encryptUtil->sha256Encrypt(newPassword, info.salt);
+	if (loginDao.changePassword(account, encryptedPassword) > 0)
+	{
+		returnJson["code"] = 100;
+	}
+
+	return returnJson;
+}
