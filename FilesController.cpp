@@ -98,6 +98,17 @@ namespace {
 			<< static_cast<long long>(modified) << "\"";
 		return stream.str();
 	}
+
+	void schedulePrivacyUploadCleanup(
+		const drogon::HttpRequestPtr& request,
+		const std::filesystem::path& destination) {
+		if (request->getParameter("privacy") != "1") return;
+		// 隐私媒体即使后续 WebSocket 投递失败，也必须有独立的清理兜底。
+		drogon::app().getLoop()->runAfter(300, [destination]() {
+			std::error_code ignored;
+			std::filesystem::remove(destination, ignored);
+		});
+	}
 }
 
 namespace api {
@@ -283,7 +294,8 @@ namespace api {
 			auto response = HttpResponse::newHttpResponse();
 			response->setStatusCode(drogon::k304NotModified);
 			response->addHeader("ETag", etag);
-			response->addHeader("Cache-Control", "private, max-age=31536000, immutable");
+			response->addHeader("Cache-Control", req->getParameter("privacy") == "1"
+				? "no-store, max-age=0" : "private, max-age=31536000, immutable");
 			callback(response);
 			return;
 		}
@@ -291,7 +303,8 @@ namespace api {
 		auto response = HttpResponse::newFileResponse(filePath.string());
 		response->setContentTypeString(mime);
 		response->addHeader("ETag", etag);
-		response->addHeader("Cache-Control", "private, max-age=31536000, immutable");
+		response->addHeader("Cache-Control", req->getParameter("privacy") == "1"
+			? "no-store, max-age=0" : "private, max-age=31536000, immutable");
 		response->addHeader("X-Content-Type-Options", "nosniff");
 		callback(response);
 	}
@@ -364,6 +377,7 @@ namespace api {
 				callback(jsonResponse(103, "Failed to finalize image", drogon::k500InternalServerError));
 				return;
 			}
+			schedulePrivacyUploadCleanup(req, destination);
 
 			Json::Value json;
 			json["code"] = 100;
@@ -412,7 +426,8 @@ namespace api {
 		auto response = HttpResponse::newFileResponse(
 			*filePath, "", drogon::CT_CUSTOM, mime, req);
 		response->addHeader("Accept-Ranges", "bytes");
-		response->addHeader("Cache-Control", "private, max-age=31536000, immutable");
+		response->addHeader("Cache-Control", req->getParameter("privacy") == "1"
+			? "no-store, max-age=0" : "private, max-age=31536000, immutable");
 		response->addHeader("X-Content-Type-Options", "nosniff");
 		callback(response);
 	}
@@ -479,6 +494,7 @@ namespace api {
 			callback(jsonResponse(103, "Failed to finalize video", drogon::k500InternalServerError));
 			return;
 		}
+		schedulePrivacyUploadCleanup(req, destination);
 
 		Json::Value json;
 		json["code"] = 100;
@@ -519,7 +535,8 @@ namespace api {
 		auto response = HttpResponse::newFileResponse(
 			*filePath, "", drogon::CT_CUSTOM, mime, req);
 		response->addHeader("Accept-Ranges", "bytes");
-		response->addHeader("Cache-Control", "private, max-age=31536000, immutable");
+		response->addHeader("Cache-Control", req->getParameter("privacy") == "1"
+			? "no-store, max-age=0" : "private, max-age=31536000, immutable");
 		response->addHeader("X-Content-Type-Options", "nosniff");
 		callback(response);
 	}
@@ -582,6 +599,7 @@ namespace api {
 			callback(jsonResponse(103, "Failed to finalize audio", drogon::k500InternalServerError));
 			return;
 		}
+		schedulePrivacyUploadCleanup(req, destination);
 		Json::Value json;
 		json["code"] = 100;
 		json["message"] = "Audio uploaded successfully";
@@ -611,7 +629,8 @@ namespace api {
 		auto response = HttpResponse::newFileResponse(*filePath);
 		response->setContentTypeCode(drogon::CT_APPLICATION_OCTET_STREAM);
 		response->addHeader("Accept-Ranges", "bytes");
-		response->addHeader("Cache-Control", "private, max-age=31536000, immutable");
+		response->addHeader("Cache-Control", req->getParameter("privacy") == "1"
+			? "no-store, max-age=0" : "private, max-age=31536000, immutable");
 		response->addHeader("X-Content-Type-Options", "nosniff");
 		callback(response);
 	}
@@ -670,6 +689,7 @@ namespace api {
 			callback(jsonResponse(103, "Failed to finalize file", drogon::k500InternalServerError));
 			return;
 		}
+		schedulePrivacyUploadCleanup(req, destination);
 
 		Json::Value json;
 		json["code"] = 100;

@@ -2,6 +2,7 @@
 #include "FriendRelationDao.h"
 #include "HeartbeatManager.h"
 #include <algorithm>
+#include <filesystem>
 #include <unordered_set>
 
 // 真正的定义（只出现一次）
@@ -23,6 +24,9 @@ struct PrivacyMessageState
     std::unordered_set<std::string> readers;
     bool isGroup{false};
     int readDelaySeconds{10};
+    std::string mediaOwnerId;
+    std::string mediaName;
+    int messageType{1};
 };
 
 std::unordered_map<std::string, PrivacyMessageState> privacyMessages;
@@ -82,6 +86,32 @@ void sendPrivacyDestroy(const PrivacyMessageState& state,
     sendToUsers(userIds, event);
 }
 
+bool safePathSegment(const std::string& value)
+{
+    return !value.empty() && value != "." && value != ".." &&
+        value.find('/') == std::string::npos &&
+        value.find('\\') == std::string::npos &&
+        value.find(':') == std::string::npos;
+}
+
+void removePrivacyMedia(const PrivacyMessageState& state)
+{
+    if (!safePathSegment(state.mediaOwnerId) ||
+        !safePathSegment(state.mediaName)) return;
+    std::filesystem::path root;
+    switch (state.messageType)
+    {
+    case 2: root = "./imageData"; break;
+    case 3: root = "./audioData"; break;
+    case 4: root = "./videoData"; break;
+    case 5: root = "./fileData"; break;
+    default: return;
+    }
+    std::error_code ignored;
+    std::filesystem::remove(
+        root / state.mediaOwnerId / state.mediaName, ignored);
+}
+
 void expireUnreadPrivacyMessage(const std::string& key)
 {
     PrivacyMessageState state;
@@ -95,6 +125,7 @@ void expireUnreadPrivacyMessage(const std::string& key)
     auto holders = state.recipients;
     holders.insert(state.senderId);
     sendPrivacyDestroy(state, holders, "unread_timeout");
+    removePrivacyMedia(state);
 }
 
 void registerPrivacyMessage(const Json::Value& jsonMsg,
@@ -110,6 +141,24 @@ void registerPrivacyMessage(const Json::Value& jsonMsg,
     state.isGroup = isGroup;
     state.readDelaySeconds = clampSeconds(
         jsonMsg["privacyReadDelaySeconds"], 10, 5, 60);
+    state.messageType = jsonInt(jsonMsg["msgType"]);
+    state.mediaOwnerId = senderId;
+    state.mediaName = jsonMsg["msgContent"].asString();
+    if (state.messageType == 3 || state.messageType == 5)
+    {
+        Json::Value payload;
+        Json::CharReaderBuilder builder;
+        std::string errors;
+        std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+        const auto content = state.mediaName;
+        if (reader->parse(content.data(), content.data() + content.size(),
+                          &payload, &errors))
+        {
+            state.mediaOwnerId = payload.get("ownerId", senderId).asString();
+            state.mediaName = payload.get(
+                state.messageType == 3 ? "audioName" : "storedName", "").asString();
+        }
+    }
     const int unreadDelay = clampSeconds(
         jsonMsg["privacyUnreadDelaySeconds"], 180, 60, 300);
     if (state.messageKey.empty()) return;
@@ -150,7 +199,7 @@ bool markPrivacyMessageRead(const Json::Value& jsonMsg,
     sendToUsers({state.senderId, reader}, readEvent);
 
     app().getLoop()->runAfter(state.readDelaySeconds,
-        [state, reader]() {
+        [state, reader, allRead]() {
             if (state.isGroup)
             {
                 sendPrivacyDestroy(state, {reader}, "read_timeout");
@@ -160,6 +209,7 @@ bool markPrivacyMessageRead(const Json::Value& jsonMsg,
                 sendPrivacyDestroy(
                     state, {state.senderId, reader}, "read_timeout");
             }
+            if (!state.isGroup || allRead) removePrivacyMedia(state);
         });
 
     if (state.isGroup && allRead)
