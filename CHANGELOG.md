@@ -40,6 +40,8 @@ All notable project changes are documented in this file.
 
 ### Fixed
 
+- Fixed Windows builds of Tencent ASR by loading Winsock2 before `Windows.h`,
+  preventing conflicts with Drogon's `ws2tcpip.h` declarations.
 - Enabled UTF-8 compilation for `UserModel.cpp`, preventing Chinese string
   literals such as gender labels from being misparsed under code page 936.
 - Fixed the MSVC build failure in private chat history deletion caused by the

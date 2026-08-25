@@ -16,6 +16,14 @@
 #include <vector>
 
 #ifdef _WIN32
+// Windows.h 默认会引入旧版 winsock.h；先加载 Winsock2，避免与 Drogon 的网络头冲突。
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <winsock2.h>
 #include <Windows.h>
 #endif
 
