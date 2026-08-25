@@ -2,6 +2,8 @@
 
 ## 2026-08-25
 
+- Added authenticated owner-only moment deletion, including transactional
+  cleanup of likes, comments, media rows, and best-effort media file removal.
 - Added dedicated chat-file upload and download endpoints with a strict
   300 MB per-file limit and owner-scoped storage.
 - Added private/group conversation previews for voice, video, and file

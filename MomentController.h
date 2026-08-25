@@ -18,6 +18,7 @@ public:
         ADD_METHOD_TO(MomentController::userList, "/api/moment/userList", drogon::Post);
         ADD_METHOD_TO(MomentController::toggleLike, "/api/moment/toggleLike", drogon::Post);
         ADD_METHOD_TO(MomentController::addComment, "/api/moment/comment", drogon::Post);
+        ADD_METHOD_TO(MomentController::deleteMoment, "/api/moment/delete", drogon::Post);
     METHOD_LIST_END
 
     void publish(const drogon::HttpRequestPtr& request,
@@ -48,6 +49,12 @@ public:
                     std::function<void(const drogon::HttpResponsePtr&)>&& callback)
     {
         handle(request, std::move(callback), &MomentService::addComment);
+    }
+
+    void deleteMoment(const drogon::HttpRequestPtr& request,
+                      std::function<void(const drogon::HttpResponsePtr&)>&& callback)
+    {
+        handle(request, std::move(callback), &MomentService::deleteMoment);
     }
 
 private:

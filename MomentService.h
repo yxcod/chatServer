@@ -12,4 +12,5 @@ public:
     Json::Value userList(const std::string& userName, const Json::Value& request) const;
     Json::Value toggleLike(const std::string& userName, const Json::Value& request) const;
     Json::Value addComment(const std::string& userName, const Json::Value& request) const;
+    Json::Value deleteMoment(const std::string& userName, const Json::Value& request) const;
 };

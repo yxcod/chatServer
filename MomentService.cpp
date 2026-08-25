@@ -4,6 +4,7 @@
 #include <cctype>
 #include <chrono>
 #include <cstdint>
+#include <filesystem>
 #include <iostream>
 #include <stdexcept>
 #include <utility>
@@ -119,6 +120,55 @@ Json::Value momentToJson(const MomentModel& moment)
     }
     value["comments"] = std::move(comments);
     return value;
+}
+
+bool isSafeMediaName(const std::string& value)
+{
+    if (value.empty() || value == "." || value == ".." || value.size() > 180)
+    {
+        return false;
+    }
+    return std::none_of(value.begin(), value.end(), [](unsigned char ch) {
+        return ch < 0x20 || ch == 0x7f || ch == '/' || ch == '\\' || ch == ':';
+    });
+}
+
+std::string queryValue(const std::string& url, const std::string& key)
+{
+    const std::string marker = key + "=";
+    const auto begin = url.find(marker);
+    if (begin == std::string::npos) return {};
+    const auto valueBegin = begin + marker.size();
+    const auto end = url.find('&', valueBegin);
+    return url.substr(valueBegin, end == std::string::npos
+        ? std::string::npos
+        : end - valueBegin);
+}
+
+void removeMomentMediaFiles(const std::string& userName,
+                            const std::vector<std::string>& mediaUrls)
+{
+    namespace fs = std::filesystem;
+    for (const auto& url : mediaUrls)
+    {
+        const bool image = url.find("/api/image/download") != std::string::npos;
+        const bool video = url.find("/api/video/download") != std::string::npos;
+        if (!image && !video) continue;
+        const std::string fileName = queryValue(
+            url, image ? "imageName" : "videoName");
+        const std::string expectedPrefix = userName + "_moment_";
+        if (!isSafeMediaName(fileName) || fileName.rfind(expectedPrefix, 0) != 0)
+        {
+            continue;
+        }
+        std::error_code error;
+        fs::remove((image ? fs::path("./imageData") : fs::path("./videoData")) /
+            userName / fileName, error);
+        if (error)
+        {
+            std::cerr << "Remove moment media failed: " << error.message() << '\n';
+        }
+    }
 }
 }
 
@@ -299,5 +349,25 @@ Json::Value MomentService::addComment(const std::string& userName,
     {
         std::cerr << "Add moment comment failed: " << error.what() << '\n';
         return response(102, "Failed to add comment");
+    }
+}
+
+Json::Value MomentService::deleteMoment(const std::string& userName,
+                                        const Json::Value& request) const
+{
+    try
+    {
+        const auto momentId = readUInt64(request["momentId"]);
+        if (momentId == 0) return response(101, "Invalid moment id");
+        const auto mediaUrls = MomentDao().deleteMoment(momentId, userName);
+        removeMomentMediaFiles(userName, mediaUrls);
+        Json::Value data(Json::objectValue);
+        data["momentId"] = Json::UInt64(momentId);
+        return successWithData(std::move(data));
+    }
+    catch (const std::exception& error)
+    {
+        std::cerr << "Delete moment failed: " << error.what() << '\n';
+        return response(102, "Failed to delete moment");
     }
 }

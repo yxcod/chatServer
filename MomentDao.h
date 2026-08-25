@@ -29,6 +29,8 @@ public:
                            const std::string& userName,
                            const std::string& content,
                            std::uint64_t now) const;
+    std::vector<std::string> deleteMoment(std::uint64_t momentId,
+                                          const std::string& authorUserName) const;
 
 private:
     MomentModel getMoment(sql::Connection* connection,

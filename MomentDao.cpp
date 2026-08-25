@@ -297,6 +297,79 @@ MomentModel MomentDao::addComment(std::uint64_t momentId,
     }
 }
 
+std::vector<std::string> MomentDao::deleteMoment(
+    std::uint64_t momentId,
+    const std::string& authorUserName) const
+{
+    auto pooled = DatabaseConnectionPool::instance().acquire();
+    sql::Connection* connection = pooled.operator->();
+    connection->setAutoCommit(false);
+
+    try
+    {
+        std::unique_ptr<sql::PreparedStatement> ownerStatement(
+            connection->prepareStatement(
+                "SELECT momentId FROM moment "
+                "WHERE momentId = ? AND authorUserName = ? FOR UPDATE"));
+        ownerStatement->setUInt64(1, momentId);
+        ownerStatement->setString(2, authorUserName);
+        std::unique_ptr<sql::ResultSet> owner(ownerStatement->executeQuery());
+        if (!owner->next())
+        {
+            throw std::runtime_error("Moment not found or not owned by user");
+        }
+
+        std::vector<std::string> mediaUrls;
+        std::unique_ptr<sql::PreparedStatement> mediaStatement(
+            connection->prepareStatement(
+                "SELECT mediaUrl FROM momentMedia WHERE momentId = ?"));
+        mediaStatement->setUInt64(1, momentId);
+        std::unique_ptr<sql::ResultSet> media(mediaStatement->executeQuery());
+        while (media->next())
+        {
+            mediaUrls.push_back(media->getString("mediaUrl").asStdString());
+        }
+
+        // Break possible reply-to-comment references before removing all
+        // comments belonging to the moment.
+        std::unique_ptr<sql::PreparedStatement> clearReplies(
+            connection->prepareStatement(
+                "UPDATE momentComment SET replyToCommentId = NULL, "
+                "replyToUserName = NULL WHERE momentId = ?"));
+        clearReplies->setUInt64(1, momentId);
+        clearReplies->executeUpdate();
+
+        const char* childTables[] = {"momentLike", "momentComment", "momentMedia"};
+        for (const char* table : childTables)
+        {
+            std::unique_ptr<sql::PreparedStatement> statement(
+                connection->prepareStatement(
+                    std::string("DELETE FROM ") + table + " WHERE momentId = ?"));
+            statement->setUInt64(1, momentId);
+            statement->executeUpdate();
+        }
+
+        std::unique_ptr<sql::PreparedStatement> momentStatement(
+            connection->prepareStatement(
+                "DELETE FROM moment WHERE momentId = ? AND authorUserName = ?"));
+        momentStatement->setUInt64(1, momentId);
+        momentStatement->setString(2, authorUserName);
+        if (momentStatement->executeUpdate() != 1)
+        {
+            throw std::runtime_error("Unable to delete moment");
+        }
+
+        connection->commit();
+        connection->setAutoCommit(true);
+        return mediaUrls;
+    }
+    catch (...)
+    {
+        rollbackQuietly(connection);
+        throw;
+    }
+}
+
 MomentModel MomentDao::getMoment(sql::Connection* connection,
                                  std::uint64_t momentId,
                                  const std::string& viewerUserName) const
