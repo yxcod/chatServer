@@ -235,6 +235,10 @@ Json::Value GroupService::getGroupConversations(const Json::Value& userInfo)
 		{
 			msgJson["lastMsg"] ="[视频]";
 		}
+		else if (convs.getMsgType() == 4)
+		{
+			msgJson["lastMsg"] ="[文件]";
+		}
 		msgJson["unreadCount"] = msgDao.getUnreadCountByUserAndGroup(userId, convs.getGroupId());
 		msgArray.append(msgJson);
 	}

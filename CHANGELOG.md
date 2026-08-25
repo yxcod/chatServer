@@ -2,6 +2,10 @@
 
 ## 2026-08-25
 
+- Added dedicated chat-file upload and download endpoints with a strict
+  300 MB per-file limit and owner-scoped storage.
+- Added private/group conversation previews for voice, video, and file
+  messages.
 - Fixed Tencent Flash ASR requests so Drogon no longer percent-encodes the
   signed query separator, which previously produced non-JSON gateway replies.
 - Added content-type-independent Tencent response parsing and safe HTTP/body

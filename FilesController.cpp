@@ -11,9 +11,11 @@ namespace {
 	constexpr std::size_t kMaxImageBytes = 5 * 1024 * 1024;
 	constexpr std::size_t kMaxVideoBytes = 300ULL * 1024 * 1024;
 	constexpr std::size_t kMaxAudioBytes = 10ULL * 1024 * 1024;
+	constexpr std::size_t kMaxChatFileBytes = 300ULL * 1024 * 1024;
 	const std::filesystem::path kImageRoot = "./imageData";
 	const std::filesystem::path kVideoRoot = "./videoData";
 	const std::filesystem::path kAudioRoot = "./audioData";
+	const std::filesystem::path kChatFileRoot = "./fileData";
 
 	bool isSafePathSegment(const std::string& value) {
 		if (value.empty() || value == "." || value == ".." || value.size() > 180) {
@@ -586,6 +588,94 @@ namespace api {
 		json["audioName"] = requestedName;
 		json["mimeType"] = mime;
 		json["byteSize"] = static_cast<Json::UInt64>(audio.fileLength());
+		auto response = HttpResponse::newHttpJsonResponse(json);
+		response->setStatusCode(drogon::k200OK);
+		callback(response);
+	}
+
+	void FilesController::loadChatFile(const HttpRequestPtr& req,
+		std::function<void(const HttpResponsePtr&)>&& callback)
+	{
+		const auto ownerId = req->getParameter("userName");
+		const auto fileName = req->getParameter("fileName");
+		if (!isSafePathSegment(ownerId) || !isSafePathSegment(fileName)) {
+			callback(jsonResponse(400, "Invalid file path", drogon::k400BadRequest));
+			return;
+		}
+		const auto filePath = FileService::getFilePath(
+			(kChatFileRoot / ownerId).string(), fileName);
+		if (!filePath) {
+			callback(jsonResponse(404, "File not found", drogon::k404NotFound));
+			return;
+		}
+		auto response = HttpResponse::newFileResponse(*filePath);
+		response->setContentTypeCode(drogon::CT_APPLICATION_OCTET_STREAM);
+		response->addHeader("Accept-Ranges", "bytes");
+		response->addHeader("Cache-Control", "private, max-age=31536000, immutable");
+		response->addHeader("X-Content-Type-Options", "nosniff");
+		callback(response);
+	}
+
+	void FilesController::upLoadChatFile(const HttpRequestPtr& req,
+		std::function<void(const HttpResponsePtr&)>&& callback)
+	{
+		const auto ownerId = req->getParameter("userName");
+		const auto requestedName = req->getParameter("fileName");
+		if (!isSafePathSegment(ownerId) || !isSafePathSegment(requestedName)) {
+			callback(jsonResponse(105, "Invalid file path", drogon::k400BadRequest));
+			return;
+		}
+		if (req->getContentType() != CT_MULTIPART_FORM_DATA) {
+			callback(jsonResponse(104, "Unsupported Content-Type", drogon::k415UnsupportedMediaType));
+			return;
+		}
+		MultiPartParser parser;
+		if (parser.parse(req) != 0) {
+			callback(jsonResponse(101, "Failed to parse file upload", drogon::k400BadRequest));
+			return;
+		}
+		const auto& files = parser.getFiles();
+		if (files.size() != 1) {
+			callback(jsonResponse(102, "Exactly one file is required", drogon::k400BadRequest));
+			return;
+		}
+		const auto& file = files[0];
+		if (file.fileLength() == 0 || file.fileLength() > kMaxChatFileBytes) {
+			callback(jsonResponse(106, "File must be between 1 byte and 300 MB", drogon::k413RequestEntityTooLarge));
+			return;
+		}
+		if (file.getFileName() != requestedName) {
+			callback(jsonResponse(107, "File name mismatch", drogon::k400BadRequest));
+			return;
+		}
+
+		const auto ownerDir = kChatFileRoot / ownerId;
+		std::error_code directoryError;
+		std::filesystem::create_directories(ownerDir, directoryError);
+		if (directoryError) {
+			callback(jsonResponse(103, "Failed to create file directory", drogon::k500InternalServerError));
+			return;
+		}
+		const auto destination = ownerDir / requestedName;
+		const auto temporary = ownerDir / (requestedName + ".uploading");
+		if (file.saveAs(temporary.string()) != 0) {
+			callback(jsonResponse(103, "Failed to save file", drogon::k500InternalServerError));
+			return;
+		}
+		std::error_code renameError;
+		std::filesystem::rename(temporary, destination, renameError);
+		if (renameError) {
+			std::error_code removeError;
+			std::filesystem::remove(temporary, removeError);
+			callback(jsonResponse(103, "Failed to finalize file", drogon::k500InternalServerError));
+			return;
+		}
+
+		Json::Value json;
+		json["code"] = 100;
+		json["message"] = "File uploaded successfully";
+		json["fileName"] = requestedName;
+		json["byteSize"] = static_cast<Json::UInt64>(file.fileLength());
 		auto response = HttpResponse::newHttpJsonResponse(json);
 		response->setStatusCode(drogon::k200OK);
 		callback(response);

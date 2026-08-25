@@ -16,6 +16,8 @@ namespace api {
 		ADD_METHOD_TO(FilesController::upLoadVideo, "/api/video/upload", Post);
 		ADD_METHOD_TO(FilesController::loadAudio, "/api/audio/download", Get);
 		ADD_METHOD_TO(FilesController::upLoadAudio, "/api/audio/upload", Post);
+		ADD_METHOD_TO(FilesController::loadChatFile, "/api/file/download", Get);
+		ADD_METHOD_TO(FilesController::upLoadChatFile, "/api/file/upload", Post);
 		METHOD_LIST_END
 		//文件下载
 		void downloadFile(const HttpRequestPtr& req,
@@ -41,6 +43,12 @@ namespace api {
 		void loadAudio(const HttpRequestPtr& req,
 			std::function<void(const HttpResponsePtr&)>&& callback);
 		void upLoadAudio(const HttpRequestPtr& req,
+			std::function<void(const HttpResponsePtr&)>&& callback);
+
+		// 聊天附件上传/下载，单个文件最大 300 MB。
+		void loadChatFile(const HttpRequestPtr& req,
+			std::function<void(const HttpResponsePtr&)>&& callback);
+		void upLoadChatFile(const HttpRequestPtr& req,
 			std::function<void(const HttpResponsePtr&)>&& callback);
 	};
 

@@ -164,8 +164,14 @@ Json::Value ChatService::insertChatRecord(const Json::Value& chatRecord)
         conv.setUser2UnreadCount(0);
     }
 
-    conv.setLastMsg(rec.getMsgType() == ChatRecord::MsgType::IMAGE
-        ? "[图片]" : rec.getMsgContent());
+    switch (rec.getMsgType())
+    {
+    case ChatRecord::MsgType::IMAGE: conv.setLastMsg("[图片]"); break;
+    case ChatRecord::MsgType::VOICE: conv.setLastMsg("[语音]"); break;
+    case ChatRecord::MsgType::VIDEO: conv.setLastMsg("[视频]"); break;
+    case ChatRecord::MsgType::FILE: conv.setLastMsg("[文件]"); break;
+    default: conv.setLastMsg(rec.getMsgContent()); break;
+    }
     conv.setLastMsgId(std::to_string(rec.getMsgId()));
     conv.setLastSenderId(rec.getSendUserId());
     if (rec.getReceiveId() == conv.getUser1Id())
