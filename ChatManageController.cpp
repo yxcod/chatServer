@@ -1,6 +1,8 @@
 #include "ChatManageController.h"
 #include "FriendRelationDao.h"
 #include "HeartbeatManager.h"
+#include <algorithm>
+#include <unordered_set>
 
 // 真正的定义（只出现一次）
 std::unordered_map<std::string, WebSocketConnectionPtr> onlineUsers;
@@ -9,6 +11,164 @@ ChatWSServer* ChatWSServer::instance_ = nullptr;
 
 namespace
 {
+std::string jsonString(const Json::Value& value);
+int jsonInt(const Json::Value& value);
+
+struct PrivacyMessageState
+{
+    std::string messageKey;
+    Json::Value messageId;
+    std::string senderId;
+    std::unordered_set<std::string> recipients;
+    std::unordered_set<std::string> readers;
+    bool isGroup{false};
+    int readDelaySeconds{10};
+};
+
+std::unordered_map<std::string, PrivacyMessageState> privacyMessages;
+std::mutex privacyMessagesMutex;
+
+int clampSeconds(const Json::Value& value, int fallback, int minimum, int maximum)
+{
+    const int parsed = jsonInt(value);
+    return std::max(minimum, std::min(maximum, parsed > 0 ? parsed : fallback));
+}
+
+std::string messageKey(const Json::Value& value)
+{
+    if (value.isString()) return value.asString();
+    if (value.isUInt64()) return std::to_string(value.asUInt64());
+    if (value.isInt64()) return std::to_string(value.asInt64());
+    if (value.isUInt()) return std::to_string(value.asUInt());
+    if (value.isInt()) return std::to_string(value.asInt());
+    return {};
+}
+
+bool isOnline(const std::string& userId)
+{
+    std::lock_guard<std::mutex> lock(connMutex);
+    const auto it = onlineUsers.find(userId);
+    return it != onlineUsers.end() && it->second && it->second->connected();
+}
+
+void sendToUsers(const std::unordered_set<std::string>& userIds,
+                 const Json::Value& event)
+{
+    std::vector<WebSocketConnectionPtr> recipients;
+    {
+        std::lock_guard<std::mutex> lock(connMutex);
+        for (const auto& userId : userIds)
+        {
+            const auto it = onlineUsers.find(userId);
+            if (it != onlineUsers.end() && it->second && it->second->connected())
+            {
+                recipients.push_back(it->second);
+            }
+        }
+    }
+    const std::string payload = jsonString(event);
+    for (const auto& recipient : recipients) recipient->send(payload);
+}
+
+void sendPrivacyDestroy(const PrivacyMessageState& state,
+                        const std::unordered_set<std::string>& userIds,
+                        const std::string& reason)
+{
+    Json::Value event;
+    event["type"] = "privacyMessageDestroy";
+    event["msgId"] = state.messageId;
+    event["privacyMode"] = true;
+    event["reason"] = reason;
+    sendToUsers(userIds, event);
+}
+
+void expireUnreadPrivacyMessage(const std::string& key)
+{
+    PrivacyMessageState state;
+    {
+        std::lock_guard<std::mutex> lock(privacyMessagesMutex);
+        const auto it = privacyMessages.find(key);
+        if (it == privacyMessages.end()) return;
+        state = it->second;
+        privacyMessages.erase(it);
+    }
+    auto holders = state.recipients;
+    holders.insert(state.senderId);
+    sendPrivacyDestroy(state, holders, "unread_timeout");
+}
+
+void registerPrivacyMessage(const Json::Value& jsonMsg,
+                            const std::string& senderId,
+                            const std::unordered_set<std::string>& recipients,
+                            bool isGroup)
+{
+    PrivacyMessageState state;
+    state.messageKey = messageKey(jsonMsg["msgId"]);
+    state.messageId = jsonMsg["msgId"];
+    state.senderId = senderId;
+    state.recipients = recipients;
+    state.isGroup = isGroup;
+    state.readDelaySeconds = clampSeconds(
+        jsonMsg["privacyReadDelaySeconds"], 10, 5, 60);
+    const int unreadDelay = clampSeconds(
+        jsonMsg["privacyUnreadDelaySeconds"], 180, 60, 300);
+    if (state.messageKey.empty()) return;
+    {
+        std::lock_guard<std::mutex> lock(privacyMessagesMutex);
+        privacyMessages[state.messageKey] = state;
+    }
+    app().getLoop()->runAfter(unreadDelay, [key = state.messageKey]() {
+        expireUnreadPrivacyMessage(key);
+    });
+}
+
+bool markPrivacyMessageRead(const Json::Value& jsonMsg,
+                            const std::string& reader)
+{
+    const std::string key = messageKey(jsonMsg["msgId"]);
+    PrivacyMessageState state;
+    bool allRead = false;
+    bool eraseState = false;
+    {
+        std::lock_guard<std::mutex> lock(privacyMessagesMutex);
+        const auto it = privacyMessages.find(key);
+        if (it == privacyMessages.end() ||
+            it->second.recipients.count(reader) == 0) return false;
+        if (!it->second.readers.insert(reader).second) return true;
+        state = it->second;
+        allRead = state.readers.size() == state.recipients.size();
+        eraseState = !state.isGroup || allRead;
+        if (eraseState) privacyMessages.erase(it);
+    }
+
+    Json::Value readEvent;
+    readEvent["type"] = "privacyMessageRead";
+    readEvent["msgId"] = state.messageId;
+    readEvent["reader"] = reader;
+    readEvent["privacyMode"] = true;
+    readEvent["destroyAfterSeconds"] = state.readDelaySeconds;
+    sendToUsers({state.senderId, reader}, readEvent);
+
+    app().getLoop()->runAfter(state.readDelaySeconds,
+        [state, reader]() {
+            if (state.isGroup)
+            {
+                sendPrivacyDestroy(state, {reader}, "read_timeout");
+            }
+            else
+            {
+                sendPrivacyDestroy(
+                    state, {state.senderId, reader}, "read_timeout");
+            }
+        });
+
+    if (state.isGroup && allRead)
+    {
+        sendPrivacyDestroy(state, {state.senderId}, "all_read");
+    }
+    return true;
+}
+
 std::string connectedUserName(const WebSocketConnectionPtr& conn)
 {
     std::lock_guard<std::mutex> lock(connMutex);
@@ -222,6 +382,33 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
             conn->send(chatService.messageFailed(jsonMsg, "invalid sender"));
             return;
         }
+        if (jsonMsg.get("privacyMode", false).asBool())
+        {
+            const std::string receiveId = jsonMsg["receiveId"].asString();
+            if (receiveId.empty() || !isOnline(receiveId))
+            {
+                conn->send(chatService.messageFailed(
+                    jsonMsg, "privacy recipient is offline"));
+                return;
+            }
+            jsonMsg["sendTime"] = Json::UInt64(
+                Logger::GetInstance().getcurrentTime());
+            jsonMsg["privacyMode"] = true;
+            registerPrivacyMessage(jsonMsg, authenticatedUser, {receiveId}, false);
+
+            Json::Value forward = jsonMsg;
+            forward["type"] = "message";
+            forward["msgStatus"] = 1;
+            sendToUsers({receiveId}, forward);
+
+            Json::Value acknowledgement;
+            acknowledgement["type"] = "delivery_ack";
+            acknowledgement["msgId"] = jsonMsg["msgId"];
+            acknowledgement["status"] = "sent";
+            acknowledgement["privacyMode"] = true;
+            conn->send(jsonString(acknowledgement));
+            return;
+        }
         Json::Value dbResult = chatService.insertChatRecord(jsonMsg);
         if (dbResult["code"].asInt() != 100)
         {
@@ -250,6 +437,12 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
     {
         ChatService chatService;
 		if (connectedUserName(conn) != jsonMsg["sender"].asString()) return;
+        const bool privacyReadHandled = markPrivacyMessageRead(
+            jsonMsg, jsonMsg["sender"].asString());
+        if (jsonMsg.get("privacyMode", false).asBool() || privacyReadHandled)
+        {
+            return;
+        }
         std::string receiveId = jsonMsg["receiveId"].asString();
         std::lock_guard<std::mutex> lock(connMutex);
         auto it = onlineUsers.find(receiveId);
@@ -343,6 +536,54 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
 		}
 		int groupId = jsonMsg["receiveId"].asInt();
 		std::vector<std::string> userIds = groupService.getUserIds(groupId);
+		if (jsonMsg.get("privacyMode", false).asBool())
+		{
+			if (std::find(userIds.begin(), userIds.end(), sender) == userIds.end())
+			{
+				Json::Value failure = jsonMsg;
+				failure["type"] = "groupChatCallback";
+				failure["code"] = 101;
+				failure["clientMsgId"] = jsonMsg["msgId"];
+				failure["error"] = "sender is not an active group member";
+				conn->send(jsonString(failure));
+				return;
+			}
+			std::unordered_set<std::string> onlineRecipients;
+			{
+				std::lock_guard<std::mutex> lock(connMutex);
+				for (const auto& member : userIds)
+				{
+					if (member == sender) continue;
+					const auto it = onlineUsers.find(member);
+					if (it != onlineUsers.end() && it->second && it->second->connected())
+						onlineRecipients.insert(member);
+				}
+			}
+			jsonMsg["sendTime"] = Json::UInt64(
+				Logger::GetInstance().getcurrentTime());
+			jsonMsg["privacyMode"] = true;
+			if (!onlineRecipients.empty())
+				registerPrivacyMessage(jsonMsg, sender, onlineRecipients, true);
+			Json::Value forward = jsonMsg;
+			forward["type"] = "groupChat";
+			forward["code"] = 100;
+			sendToUsers(onlineRecipients, forward);
+			Json::Value acknowledgement = forward;
+			acknowledgement["type"] = "groupChatCallback";
+			acknowledgement["clientMsgId"] = jsonMsg["msgId"];
+			conn->send(jsonString(acknowledgement));
+			if (onlineRecipients.empty())
+			{
+				PrivacyMessageState emptyState;
+				emptyState.messageKey = messageKey(jsonMsg["msgId"]);
+				emptyState.messageId = jsonMsg["msgId"];
+				emptyState.senderId = sender;
+				emptyState.isGroup = true;
+				sendPrivacyDestroy(
+					emptyState, {sender}, "no_online_recipients");
+			}
+			return;
+		}
 		Json::Value result = groupService.handleGroupMessage(jsonMsg);
 		if (result["code"].asInt() != 100)
 		{
@@ -394,8 +635,13 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
 		try
 		{
 			GroupService groupService;
-		const std::string reader = jsonMsg["sender"].asString();
-		if (connectedUserName(conn) != reader) return;
+			const std::string reader = jsonMsg["sender"].asString();
+			if (connectedUserName(conn) != reader) return;
+			const bool privacyReadHandled = markPrivacyMessageRead(jsonMsg, reader);
+			if (jsonMsg.get("privacyMode", false).asBool() || privacyReadHandled)
+			{
+				return;
+			}
 		const int groupId = jsonInt(jsonMsg.get(
 			"groupId", jsonMsg.get("sessionId", jsonMsg.get("receiveId", 0))));
 		const auto memberIds = groupService.getUserIds(groupId);
