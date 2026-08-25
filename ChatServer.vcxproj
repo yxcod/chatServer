@@ -143,7 +143,9 @@
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <ClCompile Include="DatabaseConnectionPool.cpp" />
-    <ClCompile Include="ChatManageController.cpp" />
+    <ClCompile Include="ChatManageController.cpp">
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="ChatRecoedModel.cpp" />
     <ClCompile Include="ChatServer.cpp" />
     <ClCompile Include="ChatService.cpp" />

@@ -46,6 +46,10 @@ All notable project changes are documented in this file.
 
 ### Fixed
 
+- Fixed privacy-message delay compilation on Windows by preventing `min` and
+  `max` macros from expanding the qualified standard-library calls.
+- Enabled UTF-8 compilation for `ChatManageController.cpp` so its Chinese
+  comments are parsed consistently instead of using Windows code page 936.
 - Fixed Windows builds of Tencent ASR by loading Winsock2 before `Windows.h`,
   preventing conflicts with Drogon's `ws2tcpip.h` declarations.
 - Enabled UTF-8 compilation for `UserModel.cpp`, preventing Chinese string

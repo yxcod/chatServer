@@ -32,10 +32,13 @@ struct PrivacyMessageState
 std::unordered_map<std::string, PrivacyMessageState> privacyMessages;
 std::mutex privacyMessagesMutex;
 
+// 将客户端传入的秒数限制在允许范围内；无效或非正数输入使用默认值。
 int clampSeconds(const Json::Value& value, int fallback, int minimum, int maximum)
 {
     const int parsed = jsonInt(value);
-    return std::max(minimum, std::min(maximum, parsed > 0 ? parsed : fallback));
+    // 用括号阻止 Windows 头文件中的 min/max 宏展开标准库函数名。
+    return (std::max)(minimum,
+        (std::min)(maximum, parsed > 0 ? parsed : fallback));
 }
 
 std::string messageKey(const Json::Value& value)
