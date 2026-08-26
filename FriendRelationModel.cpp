@@ -2,13 +2,14 @@
 #include <stdexcept>
 #include <algorithm>
 
-// 1. Ä¬ÈÏ¹¹Ôìº¯Êı£º³õÊ¼»¯Ä¬ÈÏÖµ
+// 1. é»˜è®¤æ„é€ å‡½æ•°ï¼šåˆå§‹åŒ–é»˜è®¤å€¼
 FriendRelation::FriendRelation()
-	: id(0), fromUserId(""), toUserId(""), status(RelationStatus::PENDING) {
+	: id(0), fromUserId(""), toUserId(""), status(RelationStatus::PENDING),
+	  createTime(0), updateTime(0) {
 	
 }
 
-// 2. ´ø²ÎÊı¹¹Ôìº¯Êı
+// 2. å¸¦å‚æ•°æ„é€ å‡½æ•°
 FriendRelation::FriendRelation(uint64_t id, std::string fromUserId, std::string toUserId,
 	RelationStatus status, const std::string& fromRemark,
 	const std::string& toRemark, const std::string& source,
@@ -26,7 +27,7 @@ FriendRelation::FriendRelation(uint64_t id, std::string fromUserId, std::string 
 	this->updateTime = updateTime;
 }
 
-// 3. ¿½±´¹¹Ôìº¯Êı
+// 3. æ‹·è´æ„é€ å‡½æ•°
 FriendRelation::FriendRelation(const FriendRelation& other) {
 	this->id = other.id;
 	this->fromUserId = other.fromUserId;
@@ -40,7 +41,7 @@ FriendRelation::FriendRelation(const FriendRelation& other) {
 	this->updateTime = other.updateTime;
 }
 
-// 4. ¸³ÖµÔËËã·ûÖØÔØ
+// 4. èµ‹å€¼è¿ç®—ç¬¦é‡è½½
 FriendRelation& FriendRelation::operator=(const FriendRelation& other) {
 	if (this != &other) {
 		this->id = other.id;
@@ -57,7 +58,7 @@ FriendRelation& FriendRelation::operator=(const FriendRelation& other) {
 	return *this;
 }
 
-// -------------------------- Getter º¯ÊıÊµÏÖ --------------------------
+// -------------------------- Getter å‡½æ•°å®ç° --------------------------
 uint64_t FriendRelation::getId() const {
 	return id;
 }
@@ -102,7 +103,7 @@ const uint64_t& FriendRelation::getUpdateTime() const {
 	return updateTime;
 }
 
-// -------------------------- Setter º¯ÊıÊµÏÖ --------------------------
+// -------------------------- Setter å‡½æ•°å®ç° --------------------------
 void FriendRelation::setId(uint64_t id) {
 	this->id = id;
 }
@@ -126,12 +127,11 @@ void FriendRelation::setToUserId(std::string toUserId) {
 
 void FriendRelation::setStatus(RelationStatus status) {
 	this->status = status;
-	setUpdateTimeNow();  // ×´Ì¬±ä¸üÊ±×Ô¶¯¸üĞÂÊ±¼ä
+	setUpdateTimeNow();  // çŠ¶æ€å˜æ›´æ—¶è‡ªåŠ¨æ›´æ–°æ—¶é—´
 }
 
 void FriendRelation::setStatus(uint8_t status) {
-	// Ğ£ÑéstatusºÏ·¨ĞÔ£¨½ö0-3ÓĞĞ§£©
-	if (status > static_cast<uint8_t>(RelationStatus::BLOCKED)) {
+	if (status > static_cast<uint8_t>(RelationStatus::HASDEL)) {
 		throw std::invalid_argument("invalid status value: " + std::to_string(status));
 	}
 	this->status = static_cast<RelationStatus>(status);
@@ -171,11 +171,7 @@ void FriendRelation::setCreateTime(const uint64_t& createTime) {
 }
 
 void FriendRelation::setCreateTimeNow() {
-	time_t now = time(nullptr);
-	std::tm localnow{};
-	localtime_s(&localnow, &now);
-	std::memcpy(&this->createTime, &localnow, sizeof(std::tm));
-	
+	this->createTime = static_cast<uint64_t>(std::time(nullptr));
 }
 
 void FriendRelation::setUpdateTime(const uint64_t& updateTime) {
@@ -183,21 +179,17 @@ void FriendRelation::setUpdateTime(const uint64_t& updateTime) {
 }
 
 void FriendRelation::setUpdateTimeNow() {
-	time_t now = time(nullptr);
-	std::tm localnow{};
-	localtime_s(&localnow, &now);
-	std::memcpy(&this->updateTime, &localnow, sizeof(std::tm));
-	
+	this->updateTime = static_cast<uint64_t>(std::time(nullptr));
 }
 
-// -------------------------- ¸¨Öúº¯ÊıÊµÏÖ --------------------------
+// -------------------------- è¾…åŠ©å‡½æ•°å®ç° --------------------------
 std::string FriendRelation::getStatusDesc() const {
 	switch (status) {
-	case RelationStatus::PENDING: return "´ıÑéÖ¤";
-	case RelationStatus::ACCEPTED: return "ÒÑÍ¨¹ı";
-	case RelationStatus::REJECTED: return "ÒÑ¾Ü¾ø";
-	case RelationStatus::BLOCKED: return "ÒÑÀ­ºÚ";
-	default: return "Î´Öª×´Ì¬";
+	case RelationStatus::PENDING: return "å¾…éªŒè¯";
+	case RelationStatus::ACCEPTED: return "å·²é€šè¿‡";
+	case RelationStatus::REJECTED: return "å·²æ‹’ç»";
+	case RelationStatus::BLOCKED: return "å·²æ‹‰é»‘";
+	default: return "æœªçŸ¥çŠ¶æ€";
 	}
 }
 

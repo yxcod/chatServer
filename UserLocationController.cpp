@@ -12,8 +12,7 @@ drogon::HttpResponsePtr response(int code, const std::string& message) {
     return drogon::HttpResponse::newHttpJsonResponse(value);
 }
 bool acceptedFriends(const std::string& left, const std::string& right) {
-    const auto relation = FriendRelationDao().getFriendRelation(left, right);
-    return relation.getId() > 0 && relation.getStatus() == FriendRelation::RelationStatus::ACCEPTED;
+    return FriendRelationDao().hasAcceptedRelation(left, right);
 }
 double radians(double degrees) { return degrees * 3.14159265358979323846 / 180.0; }
 double distanceMeters(const UserLocationModel& a, const UserLocationModel& b) {

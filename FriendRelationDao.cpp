@@ -280,6 +280,50 @@ FriendRelation FriendRelationDao::getFriendRelation(const std::string& userId1, 
     return relation;
 }
 
+bool FriendRelationDao::hasAcceptedRelation(const std::string& userId1, const std::string& userId2) const
+{
+    if (userId1.empty() || userId2.empty() || userId1 == userId2)
+    {
+        return false;
+    }
+
+    const std::string selectSql =
+        "SELECT 1 FROM friendrelation "
+        "WHERE ((fromUserId = ? AND toUserId = ?) "
+        "    OR (fromUserId = ? AND toUserId = ?)) "
+        "  AND status = ? "
+        "LIMIT 1";
+
+    try
+    {
+        auto con = Logger::GetInstance().createConnection();
+        if (!con)
+        {
+            Logger::GetInstance().error("Unable to verify friend relation: database connection is null");
+            return false;
+        }
+
+        std::unique_ptr<sql::PreparedStatement> pstmt(con->prepareStatement(selectSql));
+        pstmt->setString(1, userId1);
+        pstmt->setString(2, userId2);
+        pstmt->setString(3, userId2);
+        pstmt->setString(4, userId1);
+        pstmt->setUInt(5, static_cast<unsigned int>(FriendRelation::RelationStatus::ACCEPTED));
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+        return res && res->next();
+    }
+    catch (const std::exception& error)
+    {
+        Logger::GetInstance().error(
+            std::string("Unable to verify friend relation: ") + error.what());
+    }
+    catch (...)
+    {
+        Logger::GetInstance().error("Unable to verify friend relation: unknown exception");
+    }
+    return false;
+}
+
 std::string FriendRelationDao::getFriendRemark(const std::string& userId1, const std::string& userId2) const
 {
     std::string remark;

@@ -3,7 +3,7 @@
 
 // 1. 默认构造函数：初始化默认值
 UserInfo::UserInfo()// state(2)，默认值为2 SQL语句中为2则表示不写入
-	: userId(0), gender(-1), state(2){
+	: userId(0), gender(-1), createTime(0), state(2), modifyTime(0) {
 	// 初始化注册时间为当前系统时间
 	//setCreateTimeNow();
 }
@@ -169,11 +169,7 @@ void UserInfo::setModifyTime(const uint64_t& modifyTime)
 
 // 便捷方法：设置注册时间为当前系统时间
 void UserInfo::setCreateTimeNow() {
-	time_t now = time(nullptr);
-	std::tm localnow{};
-	localtime_s(&localnow, &now);
-	std::memcpy(&this->createTime, &localnow, sizeof(std::tm));
-	
+	this->createTime = static_cast<uint64_t>(std::time(nullptr));
 }
 
 void UserInfo::setState(const uint8_t& state)

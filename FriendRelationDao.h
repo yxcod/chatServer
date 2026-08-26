@@ -1,6 +1,6 @@
 #pragma once
 #include <string>
-#include <ctime>  // ÓÃÓÚÊ±¼äÀàĞÍ£¨Êı¾İ¿â DATETIME ¶ÔÓ¦ C++ tm ½á¹¹Ìå£©
+#include <ctime>  // ç”¨äºæ—¶é—´ç±»å‹ï¼ˆæ•°æ®åº“ DATETIME å¯¹åº” C++ tm ç»“æ„ä½“ï¼‰
 #include <sstream>
 #include <iomanip>
 #include "Logger.h"
@@ -10,24 +10,24 @@ class FriendRelationDao
 {
 public:
 	FriendRelationDao();
-	//»ñÈ¡¸ÃÕËºÅËùÓĞ¶ÔÓ¦×´Ì¬ºÃÓÑ state£¨0=´ıÑéÖ¤£¬1=ÒÑÍ¨¹ı£¬2=ÒÑ¾Ü¾ø£¬3=ÒÑÀ­ºÚ£©
+	//è·å–è¯¥è´¦å·æ‰€æœ‰å¯¹åº”çŠ¶æ€å¥½å‹ stateï¼ˆ0=å¾…éªŒè¯ï¼Œ1=å·²é€šè¿‡ï¼Œ2=å·²æ‹’ç»ï¼Œ3=å·²æ‹‰é»‘ï¼‰
 	void getAllFriendWithUserId(const std::string& userId, const int& state,std::vector <UserInfo> &userInfoList)const;
-	//Ôö¼ÓºÃÓÑÉêÇëĞÅÏ¢
+	//å¢åŠ å¥½å‹ç”³è¯·ä¿¡æ¯
 	int insertFriendApply(const FriendRelation& friendRelation) const;
-	//¸üĞÂºÃÓÑÉêÇë×´Ì¬ ´«ÈëÎ¨Ò»IDºÍ×´Ì¬Öµ
+	//æ›´æ–°å¥½å‹ç”³è¯·çŠ¶æ€ ä¼ å…¥å”¯ä¸€IDå’ŒçŠ¶æ€å€¼
 	int updateFriendApplyStatus(const int& relationId, const int& state) const;
-	//É¾³ıºÃÓÑ¹ØÏµ
+	//åˆ é™¤å¥½å‹å…³ç³»
 	int deleteFriendRelation(const std::string& userId1, const std::string& userId2) const;
-	//»ñÈ¡Ïòuserid·¢ËÍºÃÓÑÈÏÖ¤µÄĞÅÏ¢
+	//è·å–å‘useridå‘é€å¥½å‹è®¤è¯çš„ä¿¡æ¯
 	std::vector<FriendRelation> getToUseridFriendApplyList(const std::string& userId) const;
-	//¸ù¾İÁ½¸öÓÃ»§ID²éÑ¯ºÃÓÑ¹ØÏµ
+	//æ ¹æ®ä¸¤ä¸ªç”¨æˆ·IDæŸ¥è¯¢å¥½å‹å…³ç³»
 	FriendRelation getFriendRelation(const std::string& userId1, const std::string& userId2) const;
-	//¸ù¾İÁ½¸öÓÃ»§ID²éÑ¯ºÃÓÑ±¸×¢
+	bool hasAcceptedRelation(const std::string& userId1, const std::string& userId2) const;
+	//æ ¹æ®ä¸¤ä¸ªç”¨æˆ·IDæŸ¥è¯¢å¥½å‹å¤‡æ³¨
 	std::string getFriendRemark(const std::string& userId1, const std::string& userId2) const;
-	//¸ù¾İÁ½¸öÓÃ»§IDĞŞ¸ÄºÃÓÑ±¸×¢£¨ÎŞË³Ğò£©£¬·µ»ØÊÜÓ°ÏìĞĞÊı
+	//æ ¹æ®ä¸¤ä¸ªç”¨æˆ·IDä¿®æ”¹å¥½å‹å¤‡æ³¨ï¼ˆæ— é¡ºåºï¼‰ï¼Œè¿”å›å—å½±å“è¡Œæ•°
 	int updateFriendRemark(const std::string& userId1, const std::string& userId2, const std::string& remark) const;
-	//»ñÈ¡Ä³ÓÃ»§×î½üµÄÍ¬ÒâµÄºÃÓÑÉêÇë¼ÇÂ¼£¨3ÌìÄÚ£©
+	//è·å–æŸç”¨æˆ·æœ€è¿‘çš„åŒæ„çš„å¥½å‹ç”³è¯·è®°å½•ï¼ˆ3å¤©å†…ï¼‰
 	std::vector<FriendRelation> getRecentFriendApplyByUser(const std::string& userName, const uint64_t& nowTs) const;
 
 };
-
