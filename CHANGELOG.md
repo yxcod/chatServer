@@ -46,6 +46,10 @@ All notable project changes are documented in this file.
 
 ### Fixed
 
+- Replaced Chinese relationship-status literals with UTF-8 universal escapes,
+  preventing code page 936 from corrupting string boundaries during MSVC builds.
+- Enabled UTF-8 compilation for `FriendRelationModel.cpp` so Chinese function
+  comments cannot corrupt the following declaration under the legacy code page.
 - Fixed privacy-message delay compilation on Windows by preventing `min` and
   `max` macros from expanding the qualified standard-library calls.
 - Enabled UTF-8 compilation for `ChatManageController.cpp` so its Chinese

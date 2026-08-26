@@ -182,14 +182,14 @@ void FriendRelation::setUpdateTimeNow() {
 	this->updateTime = static_cast<uint64_t>(std::time(nullptr));
 }
 
-// -------------------------- 辅助函数实现 --------------------------
+// 返回当前好友关系状态的中文描述，便于日志及接口展示。
 std::string FriendRelation::getStatusDesc() const {
 	switch (status) {
-	case RelationStatus::PENDING: return "待验证";
-	case RelationStatus::ACCEPTED: return "已通过";
-	case RelationStatus::REJECTED: return "已拒绝";
-	case RelationStatus::BLOCKED: return "已拉黑";
-	default: return "未知状态";
+	case RelationStatus::PENDING: return u8"\u5F85\u9A8C\u8BC1";
+	case RelationStatus::ACCEPTED: return u8"\u5DF2\u901A\u8FC7";
+	case RelationStatus::REJECTED: return u8"\u5DF2\u62D2\u7EDD";
+	case RelationStatus::BLOCKED: return u8"\u5DF2\u62C9\u9ED1";
+	default: return u8"\u672A\u77E5\u72B6\u6001";
 	}
 }
 
