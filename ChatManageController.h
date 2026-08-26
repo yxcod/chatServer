@@ -53,6 +53,10 @@ public:
         const Json::Value& request,
         const std::string& action);
 
+    static void notifyAutomaticFriendGreeting(
+        const std::string& recipientId,
+        const Json::Value& greeting);
+
     // WebSocketController 接口实现
     void handleNewConnection(const HttpRequestPtr& req,
         const WebSocketConnectionPtr& conn) override;

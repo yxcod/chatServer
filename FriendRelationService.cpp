@@ -3,6 +3,10 @@
 #include "FriendRelationDao.h"
 #include "UserInfoDao.h"
 #include "ChatDao.h"
+#include "ChatService.h"
+#include <algorithm>
+#include <atomic>
+#include <cctype>
 
 namespace
 {
@@ -36,6 +40,84 @@ Json::Value requestPayload(const FriendRelation& relation)
 	request["status"] = relation.getStatusAsUInt8();
 	request["statusName"] = statusName(relation.getStatus());
 	return request;
+}
+
+bool isDigits(const std::string& value)
+{
+	return !value.empty() && std::all_of(
+		value.begin(), value.end(), [](unsigned char character) {
+			return std::isdigit(character) != 0;
+		});
+}
+
+std::string normalizedNumber(const std::string& value)
+{
+	const auto first = value.find_first_not_of('0');
+	return first == std::string::npos ? "0" : value.substr(first);
+}
+
+std::string privateSessionId(const std::string& left, const std::string& right)
+{
+	bool leftIsGreater = false;
+	if (isDigits(left) && isDigits(right))
+	{
+		const auto normalizedLeft = normalizedNumber(left);
+		const auto normalizedRight = normalizedNumber(right);
+		leftIsGreater = normalizedLeft.size() != normalizedRight.size()
+			? normalizedLeft.size() > normalizedRight.size()
+			: normalizedLeft > normalizedRight;
+	}
+	else
+	{
+		leftIsGreater = left > right;
+	}
+	return leftIsGreater ? left + "_" + right : right + "_" + left;
+}
+
+uint64_t nextAutomaticMessageId()
+{
+	static std::atomic<uint64_t> lastMessageId{0};
+	const uint64_t base = Logger::GetInstance().getcurrentTime() * 1000ULL;
+	auto observed = lastMessageId.load(std::memory_order_relaxed);
+	uint64_t candidate = 0;
+	do
+	{
+		candidate = (std::max)(base, observed + 1);
+	} while (!lastMessageId.compare_exchange_weak(
+		observed, candidate, std::memory_order_relaxed));
+	return candidate;
+}
+
+Json::Value createAutomaticFriendGreeting(const FriendRelation& relation)
+{
+	Json::Value greeting;
+	const std::string senderId = relation.getToUserId();
+	const std::string recipientId = relation.getFromUserId();
+	const uint64_t now = Logger::GetInstance().getcurrentTime();
+	greeting["msgId"] = Json::UInt64(nextAutomaticMessageId());
+	greeting["msgContent"] = u8"我们已经成功添加好友啦!";
+	greeting["sendUserId"] = senderId;
+	greeting["receiveId"] = recipientId;
+	greeting["sendTime"] = Json::UInt64(now);
+	greeting["readTime"] = Json::UInt64(0);
+	greeting["sessionId"] = privateSessionId(senderId, recipientId);
+	greeting["receiveType"] = 1;
+	greeting["msgType"] = 1;
+	greeting["msgStatus"] = 1;
+	greeting["extendInfo"] = "{}";
+
+	ChatService chatService;
+	const Json::Value insertResult = chatService.insertChatRecord(greeting);
+	if (insertResult["code"].asInt() != 100)
+	{
+		Logger::GetInstance().error(
+			"Failed to persist automatic friend greeting for request " +
+			std::to_string(relation.getId()));
+		return Json::Value();
+	}
+	greeting["sendTime"] = insertResult["sendTime"];
+	greeting["sessionId"] = insertResult["sessionId"];
+	return greeting;
 }
 }
 
@@ -144,9 +226,17 @@ Json::Value FriendRelationService::modifyFriendApplyState(const Json::Value& jso
 	}
 	if (friendRelationDao.updateFriendApplyStatus(requestId, requestResult) > 0)
 	{
+		const FriendRelation updatedRelation =
+			friendRelationDao.getFriendRelationById(requestId);
 		jsonObj["code"] = 100;
-		jsonObj["request"] = requestPayload(
-			friendRelationDao.getFriendRelationById(requestId));
+		jsonObj["request"] = requestPayload(updatedRelation);
+		if (updatedRelation.getStatus() ==
+			FriendRelation::RelationStatus::ACCEPTED)
+		{
+			const Json::Value greeting =
+				createAutomaticFriendGreeting(updatedRelation);
+			if (greeting.isObject()) jsonObj["greeting"] = greeting;
+		}
 	}
 	return jsonObj;
 }

@@ -81,6 +81,12 @@ public:
 			ChatWSServer::notifyFriendRequestUpdated(
 				{request["fromUserId"].asString(), request["toUserId"].asString()},
 				request, action);
+			if (action == "accepted" && response_data["greeting"].isObject())
+			{
+				ChatWSServer::notifyAutomaticFriendGreeting(
+					request["fromUserId"].asString(),
+					response_data["greeting"]);
+			}
 		}
 		callback(HttpResponse::newHttpJsonResponse(response_data));
 
