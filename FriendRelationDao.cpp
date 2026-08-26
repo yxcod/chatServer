@@ -79,9 +79,10 @@ int FriendRelationDao::insertFriendApply(const FriendRelation& friendRelation) c
 {
     auto con = Logger::GetInstance().createConnection();
 
-    // 先判断是否已存在这两个用户的好友关系
+    // Keep one application record for a directed user pair. A new attempt
+    // refreshes the message and create time so expiry starts again.
     std::string selectSql =
-        "SELECT id FROM friendrelation "
+        "SELECT id, status FROM friendrelation "
         "WHERE (fromUserId = ? AND toUserId = ?) "
         "LIMIT 1";
 
@@ -97,17 +98,27 @@ int FriendRelationDao::insertFriendApply(const FriendRelation& friendRelation) c
         res.reset(checkStmt->executeQuery());
         if (res->next())
         {
-            // 已存在记录：只更新 status = 0 和 updateTime
+            const auto existingStatus = res->getUInt("status");
             int relationId = res->getInt("id");
             res.reset();
 
+            if (existingStatus == static_cast<unsigned int>(
+                    FriendRelation::RelationStatus::ACCEPTED))
+            {
+                return -2;
+            }
+
             std::string updateSql =
-                "UPDATE friendrelation SET status = ?, updateTime = ? WHERE id = ?";
+                "UPDATE friendrelation SET status = ?, applyMsg = ?, "
+                "source = ?, createTime = ?, updateTime = ? WHERE id = ?";
             std::unique_ptr<sql::PreparedStatement> updateStmt(
                 con->prepareStatement(updateSql));
             updateStmt->setInt(1, 0); // 0 = 待验证
-            updateStmt->setUInt64(2, Logger::GetInstance().getcurrentTime());
-            updateStmt->setInt(3, relationId);
+            updateStmt->setString(2, friendRelation.getApplyMsg());
+            updateStmt->setString(3, friendRelation.getSource());
+            updateStmt->setUInt64(4, friendRelation.getCreateTime());
+            updateStmt->setUInt64(5, friendRelation.getUpdateTime());
+            updateStmt->setInt(6, relationId);
             return updateStmt->executeUpdate();
         }
     }
@@ -145,8 +156,18 @@ int FriendRelationDao::insertFriendApply(const FriendRelation& friendRelation) c
 
 int FriendRelationDao::updateFriendApplyStatus(const int& relationId, const int& state) const
 {
+    if (state != static_cast<int>(FriendRelation::RelationStatus::ACCEPTED) &&
+        state != static_cast<int>(FriendRelation::RelationStatus::REJECTED))
+    {
+        return 0;
+    }
+
+    const uint64_t now = Logger::GetInstance().getcurrentTime();
+    const uint64_t expiryWindow = 3ULL * 24ULL * 60ULL * 60ULL * 1000ULL;
+    const uint64_t cutoff = now > expiryWindow ? now - expiryWindow : 0;
     std::string updateSql =
-        "UPDATE friendrelation SET status = ?, updateTime = ? WHERE id = ?";
+        "UPDATE friendrelation SET status = ?, updateTime = ? "
+        "WHERE id = ? AND status = 0 AND createTime >= ?";
 
     auto con = Logger::GetInstance().createConnection();
 
@@ -155,8 +176,9 @@ int FriendRelationDao::updateFriendApplyStatus(const int& relationId, const int&
         std::unique_ptr<sql::PreparedStatement> pstmt(
             con->prepareStatement(updateSql));
         pstmt->setInt(1, state);
-        pstmt->setUInt64(2, Logger::GetInstance().getcurrentTime());
+        pstmt->setUInt64(2, now);
         pstmt->setInt(3, relationId);
+        pstmt->setUInt64(4, cutoff);
         return pstmt->executeUpdate();
     }
     catch (...)
@@ -194,44 +216,122 @@ int FriendRelationDao::deleteFriendRelation(const std::string& userId1, const st
     }
 }
 
-std::vector<FriendRelation> FriendRelationDao::getToUseridFriendApplyList(const std::string& userId) const
+std::vector<FriendRelation> FriendRelationDao::getFriendApplyListForUser(
+    const std::string& userId, const uint64_t& nowTs) const
 {
-    std::vector<FriendRelation> userInfoVector;
-
-    std::string selectSql =
-        "SELECT * FROM friendrelation WHERE toUserId = ? AND status = 0;";
-
-    auto con = Logger::GetInstance().createConnection();
+    std::vector<FriendRelation> relations;
+    const uint64_t expiryWindow = 3ULL * 24ULL * 60ULL * 60ULL * 1000ULL;
+    const uint64_t cutoff = nowTs > expiryWindow ? nowTs - expiryWindow : 0;
 
     try
     {
+        auto con = Logger::GetInstance().createConnection();
+        std::unique_ptr<sql::PreparedStatement> expireStmt(
+            con->prepareStatement(
+                "UPDATE friendrelation SET status = 6, updateTime = ? "
+                "WHERE (fromUserId = ? OR toUserId = ?) "
+                "AND status = 0 AND createTime < ?"));
+        expireStmt->setUInt64(1, nowTs);
+        expireStmt->setString(2, userId);
+        expireStmt->setString(3, userId);
+        expireStmt->setUInt64(4, cutoff);
+        expireStmt->executeUpdate();
+
         std::unique_ptr<sql::PreparedStatement> pstmt(
-            con->prepareStatement(selectSql));
+            con->prepareStatement(
+                "SELECT * FROM friendrelation "
+                "WHERE (fromUserId = ? OR toUserId = ?) "
+                "AND status IN (0, 2, 6) "
+                "ORDER BY updateTime DESC, id DESC LIMIT 100"));
         pstmt->setString(1, userId);
+        pstmt->setString(2, userId);
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
-        UserInfoDao userInfoDao;
         while (res->next())
         {
-            FriendRelation friendRelation;
-            friendRelation.setId(res->getInt("id"));
-            friendRelation.setCreateTime(res->getUInt64("createTime"));
-            friendRelation.setFromUserId(res->getString("fromUserId"));
-            friendRelation.setToUserId(res->getString("toUserId"));
-            friendRelation.setApplyMsg(res->getString("applyMsg"));
-
-            UserInfo userInfo = userInfoDao.getUserinfo(res->getString("fromUserId"));
-            friendRelation.setToUserId(userInfo.getNickName());
-
-            userInfoVector.push_back(friendRelation);
+            FriendRelation relation;
+            relation.setId(res->getUInt64("id"));
+            relation.setFromUserId(res->getString("fromUserId"));
+            relation.setToUserId(res->getString("toUserId"));
+            relation.setStatus(static_cast<uint8_t>(res->getUInt("status")));
+            relation.setFromRemark(res->getString("fromRemark"));
+            relation.setToRemark(res->getString("toRemark"));
+            relation.setSource(res->getString("source"));
+            relation.setApplyMsg(res->getString("applyMsg"));
+            relation.setCreateTime(res->getUInt64("createTime"));
+            relation.setUpdateTime(res->getUInt64("updateTime"));
+            relations.push_back(relation);
         }
     }
-    catch (...)
+    catch (const std::exception& error)
     {
-        return userInfoVector;
+        Logger::GetInstance().error(
+            std::string("Failed to load friend applications: ") + error.what());
     }
+    return relations;
+}
 
-    return userInfoVector;
+FriendRelation FriendRelationDao::getFriendRelationById(uint64_t relationId) const
+{
+    FriendRelation relation;
+    try
+    {
+        auto con = Logger::GetInstance().createConnection();
+        std::unique_ptr<sql::PreparedStatement> pstmt(
+            con->prepareStatement("SELECT * FROM friendrelation WHERE id = ? LIMIT 1"));
+        pstmt->setUInt64(1, relationId);
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+        if (!res->next()) return relation;
+        relation.setId(res->getUInt64("id"));
+        relation.setFromUserId(res->getString("fromUserId"));
+        relation.setToUserId(res->getString("toUserId"));
+        relation.setStatus(static_cast<uint8_t>(res->getUInt("status")));
+        relation.setFromRemark(res->getString("fromRemark"));
+        relation.setToRemark(res->getString("toRemark"));
+        relation.setSource(res->getString("source"));
+        relation.setApplyMsg(res->getString("applyMsg"));
+        relation.setCreateTime(res->getUInt64("createTime"));
+        relation.setUpdateTime(res->getUInt64("updateTime"));
+    }
+    catch (const std::exception& error)
+    {
+        Logger::GetInstance().error(
+            std::string("Failed to load friend application by id: ") + error.what());
+    }
+    return relation;
+}
+
+FriendRelation FriendRelationDao::getDirectedFriendRelation(
+    const std::string& fromUserId, const std::string& toUserId) const
+{
+    FriendRelation relation;
+    try
+    {
+        auto con = Logger::GetInstance().createConnection();
+        std::unique_ptr<sql::PreparedStatement> pstmt(con->prepareStatement(
+            "SELECT * FROM friendrelation WHERE fromUserId = ? AND toUserId = ? "
+            "ORDER BY id DESC LIMIT 1"));
+        pstmt->setString(1, fromUserId);
+        pstmt->setString(2, toUserId);
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+        if (!res->next()) return relation;
+        relation.setId(res->getUInt64("id"));
+        relation.setFromUserId(res->getString("fromUserId"));
+        relation.setToUserId(res->getString("toUserId"));
+        relation.setStatus(static_cast<uint8_t>(res->getUInt("status")));
+        relation.setFromRemark(res->getString("fromRemark"));
+        relation.setToRemark(res->getString("toRemark"));
+        relation.setSource(res->getString("source"));
+        relation.setApplyMsg(res->getString("applyMsg"));
+        relation.setCreateTime(res->getUInt64("createTime"));
+        relation.setUpdateTime(res->getUInt64("updateTime"));
+    }
+    catch (const std::exception& error)
+    {
+        Logger::GetInstance().error(
+            std::string("Failed to load directed friend application: ") + error.what());
+    }
+    return relation;
 }
 
 FriendRelation FriendRelationDao::getFriendRelation(const std::string& userId1, const std::string& userId2) const
@@ -423,15 +523,11 @@ std::vector<FriendRelation> FriendRelationDao::getRecentFriendApplyByUser(const 
 {
     std::vector<FriendRelation> relations;
 
-    const uint64_t tenDaysMs = 10ULL * 24ULL * 60ULL * 60ULL * 1000ULL;
-    uint64_t beginTs = nowTs > tenDaysMs ? nowTs - tenDaysMs : 0;
-
     std::string selectSql =
         "SELECT * FROM friendrelation "
-        "WHERE toUserId = ? "
+        "WHERE (fromUserId = ? OR toUserId = ?) "
         "  AND status = 1 "
-        "  AND createTime >= ? "
-        "  AND createTime <= ?";
+        "ORDER BY updateTime DESC, id DESC LIMIT 50";
 
     auto con = Logger::GetInstance().createConnection();
 
@@ -442,8 +538,7 @@ std::vector<FriendRelation> FriendRelationDao::getRecentFriendApplyByUser(const 
         std::unique_ptr<sql::PreparedStatement> pstmt(
             con->prepareStatement(selectSql));
         pstmt->setString(1, userName);
-        pstmt->setUInt64(2, beginTs);
-        pstmt->setUInt64(3, nowTs);
+        pstmt->setString(2, userName);
 
         res.reset(pstmt->executeQuery());
         while (res->next())
@@ -452,7 +547,7 @@ std::vector<FriendRelation> FriendRelationDao::getRecentFriendApplyByUser(const 
             relation.setId(res->getUInt64("id"));
             relation.setFromUserId(res->getString("fromUserId"));
             relation.setToUserId(res->getString("toUserId"));
-            // relation.setStatus(static_cast<uint8_t>(res->getUInt("status")));
+            relation.setStatus(static_cast<uint8_t>(res->getUInt("status")));
             relation.setFromRemark(res->getString("fromRemark"));
             relation.setToRemark(res->getString("toRemark"));
             relation.setSource(res->getString("source"));

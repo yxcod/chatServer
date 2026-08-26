@@ -6,17 +6,17 @@ class FriendRelationService
 public:
 	FriendRelationService();
 	~FriendRelationService() = default;
-	//·¢ËÍºÃÓÑÉêÇë
+	//å‘é€å¥½å‹ç”³è¯·
 	Json::Value sendFriendApply(const Json::Value& jsonValue) const;
-	//»ñÈ¡¶ÔÓ¦·¢ËÍ¸øuserIdÑéÖ¤µÄºÃÓÑÁĞ±í
+	//è·å–å¯¹åº”å‘é€ç»™userIdéªŒè¯çš„å¥½å‹åˆ—è¡¨
 	Json::Value getPendingFriendApplyList(const Json::Value& jsonValue) const;
-	//¸üĞÂºÃÓÑÉêÇë×´Ì¬
+	//æ›´æ–°å¥½å‹ç”³è¯·çŠ¶æ€
 	Json::Value modifyFriendApplyState(const Json::Value& jsonValue) const;
-	//É¾³ıºÃÓÑ
+	//åˆ é™¤å¥½å‹
 	Json::Value deleteFriend(const Json::Value& jsonValue) const;
-	//¸üĞÂºÃÓÑ±¸×¢
+	//æ›´æ–°å¥½å‹å¤‡æ³¨
 	Json::Value updateFriendRemark(const Json::Value& jsonValue) const;
-	//»ñÈ¡×î½üÍ¬ÒâµÄºÃÓÑÉêÇë¼ÇÂ¼
+	//è·å–æœ€è¿‘åŒæ„çš„å¥½å‹ç”³è¯·è®°å½•
 	Json::Value getRecentAgreedFriendApply(const Json::Value& jsonValue) const;
 };
 

@@ -131,7 +131,7 @@ void FriendRelation::setStatus(RelationStatus status) {
 }
 
 void FriendRelation::setStatus(uint8_t status) {
-	if (status > static_cast<uint8_t>(RelationStatus::HASDEL)) {
+	if (status > static_cast<uint8_t>(RelationStatus::EXPIRED)) {
 		throw std::invalid_argument("invalid status value: " + std::to_string(status));
 	}
 	this->status = static_cast<RelationStatus>(status);
@@ -189,6 +189,7 @@ std::string FriendRelation::getStatusDesc() const {
 	case RelationStatus::ACCEPTED: return u8"\u5DF2\u901A\u8FC7";
 	case RelationStatus::REJECTED: return u8"\u5DF2\u62D2\u7EDD";
 	case RelationStatus::BLOCKED: return u8"\u5DF2\u62C9\u9ED1";
+	case RelationStatus::EXPIRED: return u8"\u5DF2\u8FC7\u671F";
 	default: return u8"\u672A\u77E5\u72B6\u6001";
 	}
 }

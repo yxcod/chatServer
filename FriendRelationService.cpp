@@ -3,6 +3,42 @@
 #include "FriendRelationDao.h"
 #include "UserInfoDao.h"
 #include "ChatDao.h"
+
+namespace
+{
+const char* statusName(FriendRelation::RelationStatus status)
+{
+	switch (status)
+	{
+	case FriendRelation::RelationStatus::PENDING: return "pending";
+	case FriendRelation::RelationStatus::ACCEPTED: return "accepted";
+	case FriendRelation::RelationStatus::REJECTED: return "rejected";
+	case FriendRelation::RelationStatus::EXPIRED: return "expired";
+	default: return "unavailable";
+	}
+}
+
+Json::Value requestPayload(const FriendRelation& relation)
+{
+	Json::Value request;
+	if (relation.getId() == 0) return request;
+	UserInfoDao userInfoDao;
+	const auto fromUser = userInfoDao.getUserinfo(relation.getFromUserId());
+	const auto toUser = userInfoDao.getUserinfo(relation.getToUserId());
+	request["id"] = Json::UInt64(relation.getId());
+	request["fromUserId"] = relation.getFromUserId();
+	request["toUserId"] = relation.getToUserId();
+	request["fromNickName"] = fromUser.getNickName();
+	request["toNickName"] = toUser.getNickName();
+	request["applyMsg"] = relation.getApplyMsg();
+	request["createTime"] = Json::UInt64(relation.getCreateTime());
+	request["updateTime"] = Json::UInt64(relation.getUpdateTime());
+	request["status"] = relation.getStatusAsUInt8();
+	request["statusName"] = statusName(relation.getStatus());
+	return request;
+}
+}
+
 FriendRelationService::FriendRelationService()
 {
 }
@@ -10,11 +46,15 @@ FriendRelationService::FriendRelationService()
 Json::Value FriendRelationService::sendFriendApply(const Json::Value& jsonValue) const
 {
 	Json::Value response_data;
-	//”√ªß≤ª¥Ê‘⁄
 	response_data["code"] = 101;
 	std::string fromUserId = jsonValue["fromUserId"].asString();
 	std::string toUserId = jsonValue["toUserId"].asString();
 	std::string applyMsg = jsonValue["applyMsg"].asString();
+	if (fromUserId.empty() || toUserId.empty() || fromUserId == toUserId)
+	{
+		response_data["code"] = 99;
+		return response_data;
+	}
 	UserInfoDao userInfoDao;
 	UserInfo userInfo = userInfoDao.getUserinfo(toUserId);
 	if (userInfo.getUserAccount() == "")
@@ -25,6 +65,11 @@ Json::Value FriendRelationService::sendFriendApply(const Json::Value& jsonValue)
 	response_data["nickname"] = userInfo.getNickName();
 	FriendRelation friendRelation;
 	FriendRelationDao friendRelationDao;
+	if (friendRelationDao.hasAcceptedRelation(fromUserId, toUserId))
+	{
+		response_data["code"] = 103;
+		return response_data;
+	}
 	friendRelation.setFromUserId(fromUserId);
 	friendRelation.setToUserId(toUserId);
 	friendRelation.setApplyMsg(applyMsg);
@@ -33,13 +78,15 @@ Json::Value FriendRelationService::sendFriendApply(const Json::Value& jsonValue)
 	friendRelation.setFromRemark("");
 	friendRelation.setToRemark("");
 	friendRelation.setSource("");
-	if (friendRelationDao.insertFriendApply(friendRelation) > 0)
+	const int inserted = friendRelationDao.insertFriendApply(friendRelation);
+	if (inserted > 0)
 	{
 		response_data["code"] = 100;
+		response_data["request"] = requestPayload(
+			friendRelationDao.getDirectedFriendRelation(fromUserId, toUserId));
 		return response_data;
 	}
-	//∫√”—±Ì≤Â»Î ß∞‹
-	response_data["code"] = 102;
+	response_data["code"] = inserted == -2 ? 103 : 102;
 	return response_data;
 }
 
@@ -48,25 +95,24 @@ Json::Value FriendRelationService::getPendingFriendApplyList(const Json::Value& 
 	std::string userName = jsonValue["userName"].asString();
 	Json::Value jsonObj;
 	FriendRelationDao friendRelationDao;
-	//±Ì æµ±«∞Œﬁ∑¢ÀÕ«Î«Û
-	jsonObj["code"] = 101;
-	jsonObj["applyFriendList"] = Json::arrayValue;
-	std::vector<FriendRelation> friendApplyList = friendRelationDao.getToUseridFriendApplyList(userName);
-	if (friendApplyList.size() == 0)
-	{
-		return jsonObj;
-	}
 	jsonObj["code"] = 100;
+	jsonObj["applyFriendList"] = Json::arrayValue;
+	std::vector<FriendRelation> friendApplyList =
+		friendRelationDao.getFriendApplyListForUser(
+			userName, Logger::GetInstance().getcurrentTime());
 	Json::Value FriendListArr(Json::arrayValue);
 	for (const auto& friendInfo : friendApplyList)
 	{
-		Json::Value jsonfriendObj;
-		jsonfriendObj["id"] = friendInfo.getId();
-		jsonfriendObj["fromUserId"] = friendInfo.getFromUserId();
-		jsonfriendObj["createTime"] = friendInfo.getCreateTime();
-		jsonfriendObj["applyMsg"] = friendInfo.getApplyMsg();
-		//’‚¿Ô”√ToUserId¿¥¥˙ÃÊ∑¢∆”√ªßµƒÍ«≥∆
-		jsonfriendObj["nickName"] = friendInfo.getToUserId();
+		Json::Value jsonfriendObj = requestPayload(friendInfo);
+		const bool incoming = friendInfo.getToUserId() == userName;
+		jsonfriendObj["direction"] = incoming ? "incoming" : "outgoing";
+		const std::string counterpart = incoming
+			? friendInfo.getFromUserId() : friendInfo.getToUserId();
+		UserInfo counterpartInfo = UserInfoDao().getUserinfo(counterpart);
+		jsonfriendObj["userName"] = counterpart;
+		jsonfriendObj["nickName"] = counterpartInfo.getNickName();
+		jsonfriendObj["canRespond"] = incoming &&
+			friendInfo.getStatus() == FriendRelation::RelationStatus::PENDING;
 		FriendListArr.append(jsonfriendObj);
 	}
 	jsonObj["applyFriendList"] = FriendListArr;
@@ -80,11 +126,27 @@ Json::Value FriendRelationService::modifyFriendApplyState(const Json::Value& jso
 	FriendRelationDao friendRelationDao;
 	int requestId = jsonValue["requestId"].asInt();
 	int requestResult = jsonValue["requestResult"].asInt();
-	std::string sessionId = jsonValue["sessionId"].asString();
+	std::string userName = jsonValue["userName"].asString();
+	FriendRelation relation = friendRelationDao.getFriendRelationById(requestId);
+	if (relation.getId() == 0 || relation.getToUserId() != userName)
+	{
+		jsonObj["code"] = 403;
+		return jsonObj;
+	}
+	friendRelationDao.getFriendApplyListForUser(
+		userName, Logger::GetInstance().getcurrentTime());
+	relation = friendRelationDao.getFriendRelationById(requestId);
+	if (relation.getStatus() != FriendRelation::RelationStatus::PENDING)
+	{
+		jsonObj["code"] = 104;
+		jsonObj["request"] = requestPayload(relation);
+		return jsonObj;
+	}
 	if (friendRelationDao.updateFriendApplyStatus(requestId, requestResult) > 0)
 	{
-		
 		jsonObj["code"] = 100;
+		jsonObj["request"] = requestPayload(
+			friendRelationDao.getFriendRelationById(requestId));
 	}
 	return jsonObj;
 }
@@ -97,15 +159,15 @@ Json::Value FriendRelationService::deleteFriend(const Json::Value& jsonValue) co
 	std::string fromUserName = jsonValue["fromUserName"].asString();
 	std::string toUserName = jsonValue["toUserName"].asString();
 	std::string sessionId = jsonValue["sessionId"].asString();
-	//∏¸–¬∫√”—πÿœµ◊¥Ã¨Œ™…æ≥˝
+	//Êõ¥Êñ∞Â•ΩÂèãÂÖ≥Á≥ªÁä∂ÊÄÅ‰∏∫Âà†Èô§
 	if (friendRelationDao.deleteFriendRelation(fromUserName, toUserName) > 0)
 	{
 
-		//…æ≥˝ª·ª∞±Ì
+		//Âà†Èô§‰ºöËØùË°®
 		ChatDao chatDao;
-		//…æ≥˝ª·ª∞º«¬º
+		//Âà†Èô§‰ºöËØùËÆ∞ÂΩï
 		chatDao.deleteConversationByConvId(sessionId);
-		//…æ≥˝ª·ª∞œ¬µƒ¡ƒÃÏº«¬º
+		//Âà†Èô§‰ºöËØù‰∏ãÁöÑËÅäÂ§©ËÆ∞ÂΩï
 		chatDao.deleteChatRecordsBetweenUsers(sessionId);
 		jsonObj["code"] = 100;
 		return jsonObj;
@@ -121,7 +183,7 @@ Json::Value FriendRelationService::updateFriendRemark(const Json::Value& jsonVal
 	std::string fromUserName = jsonValue["userName"].asString();
 	std::string toUserName = jsonValue["friendUserName"].asString();
 	std::string remarContent = jsonValue["remark"].asString();
-	//∏¸–¬∫√”—±∏◊¢
+	//Êõ¥Êñ∞Â•ΩÂèãÂ§áÊ≥®
 	if (friendRelationDao.updateFriendRemark(fromUserName, toUserName, remarContent) > 0)
 	{
 		jsonObj["code"] = 100;
@@ -138,20 +200,19 @@ Json::Value FriendRelationService::getRecentAgreedFriendApply(const Json::Value&
 	std::string fromUserName = jsonValue["userName"].asString();
 	std::vector<FriendRelation> friendApplyList = friendRelationDao.getRecentFriendApplyByUser(fromUserName, Logger::GetInstance().getcurrentTime());
 	Json::Value FriendListArr(Json::arrayValue);
-	if (friendApplyList.size() == 0)
-	{
-		return jsonObj;
-	}
+	jsonObj["recentFriendsList"] = FriendListArr;
 	for (const auto& friendInfo : friendApplyList)
 	{
 		jsonObj["code"] = 100;
+		const std::string counterpart = friendInfo.getFromUserId() == fromUserName
+			? friendInfo.getToUserId() : friendInfo.getFromUserId();
 		UserInfoDao userInfoDao;
-		UserInfo userInfo = userInfoDao.getUserinfo(friendInfo.getFromUserId());
+		UserInfo userInfo = userInfoDao.getUserinfo(counterpart);
 		Json::Value jsonfriendObj;
-		jsonfriendObj["userName"] = friendInfo.getFromUserId();
-		jsonfriendObj["addTime"] = friendInfo.getCreateTime();
+		jsonfriendObj["userName"] = counterpart;
+		jsonfriendObj["addTime"] = Json::UInt64(friendInfo.getUpdateTime());
 		jsonfriendObj["nickName"] = userInfo.getNickName();
-		//’‚¿Ô”√ToUserId¿¥¥˙ÃÊ∑¢∆”√ªßµƒÍ«≥∆
+		//ËøôÈáåÁî®ToUserIdÊù•‰ª£ÊõøÂèëËµ∑Áî®Êà∑ÁöÑÊòµÁß∞
 		jsonfriendObj["remarks"] = userInfo.getNickName();
 		FriendListArr.append(jsonfriendObj);
 	}

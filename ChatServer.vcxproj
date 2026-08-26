@@ -147,16 +147,22 @@
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <ClCompile Include="ChatRecoedModel.cpp" />
-    <ClCompile Include="ChatServer.cpp" />
+    <ClCompile Include="ChatServer.cpp">
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="ChatService.cpp" />
     <ClCompile Include="EncryptUtil.cpp" />
     <ClCompile Include="FilesController.cpp" />
     <ClCompile Include="FileService.cpp" />
-    <ClCompile Include="FriendRelationDao.cpp" />
+    <ClCompile Include="FriendRelationDao.cpp">
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="FriendRelationModel.cpp">
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
-    <ClCompile Include="FriendRelationService.cpp" />
+    <ClCompile Include="FriendRelationService.cpp">
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="GroupChatDao.cpp" />
     <ClCompile Include="GroupConversationDao.cpp" />
     <ClCompile Include="GroupMemberDao.cpp" />

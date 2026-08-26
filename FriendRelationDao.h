@@ -18,8 +18,12 @@ public:
 	int updateFriendApplyStatus(const int& relationId, const int& state) const;
 	//删除好友关系
 	int deleteFriendRelation(const std::string& userId1, const std::string& userId2) const;
-	//获取向userid发送好友认证的信息
-	std::vector<FriendRelation> getToUseridFriendApplyList(const std::string& userId) const;
+	// Return incoming and outgoing application records visible to the user.
+	std::vector<FriendRelation> getFriendApplyListForUser(
+		const std::string& userId, const uint64_t& nowTs) const;
+	FriendRelation getFriendRelationById(uint64_t relationId) const;
+	FriendRelation getDirectedFriendRelation(
+		const std::string& fromUserId, const std::string& toUserId) const;
 	//根据两个用户ID查询好友关系
 	FriendRelation getFriendRelation(const std::string& userId1, const std::string& userId2) const;
 	bool hasAcceptedRelation(const std::string& userId1, const std::string& userId2) const;

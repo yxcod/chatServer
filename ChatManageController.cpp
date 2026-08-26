@@ -375,6 +375,20 @@ void ChatWSServer::notifyGroupMemberRoleUpdated(
     for (const auto& recipient : recipients) recipient->send(payload);
 }
 
+void ChatWSServer::notifyFriendRequestUpdated(
+    const std::vector<std::string>& userIds,
+    const Json::Value& request,
+    const std::string& action)
+{
+    Json::Value event = request;
+    event["type"] = "friendRequestUpdated";
+    event["action"] = action;
+    event["serverTime"] = Json::UInt64(Logger::GetInstance().getcurrentTime());
+    std::unordered_set<std::string> uniqueUsers(
+        userIds.begin(), userIds.end());
+    sendToUsers(uniqueUsers, event);
+}
+
 void ChatWSServer::handleNewConnection(const HttpRequestPtr& req,
     const WebSocketConnectionPtr& conn)
 {

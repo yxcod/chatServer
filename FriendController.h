@@ -3,6 +3,7 @@
 #include <openssl/md5.h>
 #include <string>
 #include "FriendRelationService.h"
+#include "ChatManageController.h"
 #include "JwtTokenUtil.h"
 using namespace drogon;
 using namespace drogon::orm;
@@ -17,54 +18,74 @@ public:
 	ADD_METHOD_TO(FriendController::updateFriendRemark, "/api/friend/updateRemark", Post);
 	ADD_METHOD_TO(FriendController::getRecentAgreedFriendApply, "/api/friend/recentAgreedRequests", Post);
 	METHOD_LIST_END
-	// ·¢ËÍºÃÓÑÉêÇë
+	// å‘é€å¥½å‹ç”³è¯·
 		void sendFriendApply(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback)
 	{
 		std::cout << "registerUser\n";
 		auto json = req->getJsonObject();
-		Logger::GetInstance().debugJson(*json);
 		Json::Value response_data;
 		if (!json || !json->isMember("fromUserId") || !json->isMember("toUserId") || !json->isMember("applyMsg")) {
 			response_data["code"] = 99;
 			callback(HttpResponse::newHttpJsonResponse(response_data));
 			return;
 		}
+		Logger::GetInstance().debugJson(*json);
 		FriendRelationService friendService;
-		callback(HttpResponse::newHttpJsonResponse(friendService.sendFriendApply(*json)));
+		response_data = friendService.sendFriendApply(*json);
+		if (response_data["code"].asInt() == 100 &&
+			response_data["request"].isObject())
+		{
+			ChatWSServer::notifyFriendRequestUpdated(
+				{(*json)["fromUserId"].asString(), (*json)["toUserId"].asString()},
+				response_data["request"], "created");
+		}
+		callback(HttpResponse::newHttpJsonResponse(response_data));
 
 
 	}
-	//»ñÈ¡Ïò¸ÃÓÃ»§·¢ÆğºÃÓÑÇëÇóµÄÁĞ±í
+	//è·å–å‘è¯¥ç”¨æˆ·å‘èµ·å¥½å‹è¯·æ±‚çš„åˆ—è¡¨
 	void getFriendApply(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback)
 	{
 		auto json = req->getJsonObject();
-		Logger::GetInstance().debugJson(*json);
 		Json::Value response_data;
 		if (!json || !json->isMember("userName")) {
 			response_data["code"] = 99;
 			callback(HttpResponse::newHttpJsonResponse(response_data));
 			return;
 		}
+		Logger::GetInstance().debugJson(*json);
 		FriendRelationService friendService;
 		callback(HttpResponse::newHttpJsonResponse(friendService.getPendingFriendApplyList(*json)));
 
 	}
-	//¸üĞÂºÃÓÑ¹ØÏµ×´Ì¬
+	//æ›´æ–°å¥½å‹å…³ç³»çŠ¶æ€
 	void updateFriendApplyState(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback)
 	{
 		auto json = req->getJsonObject();
-		Logger::GetInstance().debugJson(*json);
 		Json::Value response_data;
-		if (!json || !json->isMember("requestId") || !json->isMember("requestResult")) {
+		if (!json || !json->isMember("requestId") ||
+			!json->isMember("requestResult") || !json->isMember("userName")) {
 			response_data["code"] = 99;
 			callback(HttpResponse::newHttpJsonResponse(response_data));
 			return;
 		}
+		Logger::GetInstance().debugJson(*json);
 		FriendRelationService friendService;
-		callback(HttpResponse::newHttpJsonResponse(friendService.modifyFriendApplyState(*json)));
+		response_data = friendService.modifyFriendApplyState(*json);
+		if (response_data["code"].asInt() == 100 &&
+			response_data["request"].isObject())
+		{
+			const auto& request = response_data["request"];
+			const std::string action = request["status"].asInt() == 1
+				? "accepted" : "rejected";
+			ChatWSServer::notifyFriendRequestUpdated(
+				{request["fromUserId"].asString(), request["toUserId"].asString()},
+				request, action);
+		}
+		callback(HttpResponse::newHttpJsonResponse(response_data));
 
 	}
-	//É¾³ıºÃÓÑ
+	//åˆ é™¤å¥½å‹
 	void deleteFriend(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback)
 	{
 		auto json = req->getJsonObject();
@@ -79,7 +100,7 @@ public:
 		callback(HttpResponse::newHttpJsonResponse(friendService.deleteFriend(*json)));
 
 	}
-	//¸üĞÂºÃÓÑ±¸×¢
+	//æ›´æ–°å¥½å‹å¤‡æ³¨
 	void updateFriendRemark(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback)
 	{
 		auto json = req->getJsonObject();
@@ -93,7 +114,7 @@ public:
 		FriendRelationService friendService;
 		callback(HttpResponse::newHttpJsonResponse(friendService.updateFriendRemark(*json)));
 	}
-	//»ñÈ¡×î½üÍ¬ÒâµÄºÃÓÑÉêÇë¼ÇÂ¼
+	//è·å–æœ€è¿‘åŒæ„çš„å¥½å‹ç”³è¯·è®°å½•
 	void getRecentAgreedFriendApply(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback)
 	{
 		auto json = req->getJsonObject();

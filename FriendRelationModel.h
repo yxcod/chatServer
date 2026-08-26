@@ -7,94 +7,95 @@
 #include <iomanip>
 
 /**
- * ºÃÓÑ¹ØÏµÄ£ĞÍ£¨¶ÔÓ¦ MySQL friend_relation ±í£©
- * ×Ö¶ÎÓ³Éä£º
- * id           ¡ú BIGINT UNSIGNED ¡ú uint64_t
- * fromUserId   ¡ú BIGINT UNSIGNED ¡ú uint64_t£¨·¢Æğ·½ÓÃ»§ID£©
- * toUserId     ¡ú BIGINT UNSIGNED ¡ú uint64_t£¨½ÓÊÕ·½ÓÃ»§ID£©
- * status       ¡ú TINYINT         ¡ú uint8_t£¨0=´ıÑéÖ¤£¬1=ÒÑÍ¨¹ı£¬2=ÒÑ¾Ü¾ø£¬3=ÒÑÀ­ºÚ£©
- * fromRemark   ¡ú VARCHAR(50)     ¡ú std::string£¨·¢Æğ·½¶Ô½ÓÊÕ·½µÄ±¸×¢£©
- * toRemark     ¡ú VARCHAR(50)     ¡ú std::string£¨½ÓÊÕ·½¶Ô·¢Æğ·½µÄ±¸×¢£©
- * source       ¡ú VARCHAR(30)     ¡ú std::string£¨ºÃÓÑÀ´Ô´£©
- * applyMsg     ¡ú VARCHAR(200)    ¡ú std::string£¨ÉêÇëÏûÏ¢£©
- * createTime   ¡ú DATETIME        ¡ú std::tm£¨ÉêÇëÊ±¼ä£©
- * updateTime   ¡ú DATETIME        ¡ú std::tm£¨×´Ì¬¸üĞÂÊ±¼ä£©
+ * å¥½å‹å…³ç³»æ¨¡å‹ï¼ˆå¯¹åº” MySQL friend_relation è¡¨ï¼‰
+ * å­—æ®µæ˜ å°„ï¼š
+ * id           â†’ BIGINT UNSIGNED â†’ uint64_t
+ * fromUserId   â†’ BIGINT UNSIGNED â†’ uint64_tï¼ˆå‘èµ·æ–¹ç”¨æˆ·IDï¼‰
+ * toUserId     â†’ BIGINT UNSIGNED â†’ uint64_tï¼ˆæ¥æ”¶æ–¹ç”¨æˆ·IDï¼‰
+ * status       â†’ TINYINT         â†’ uint8_tï¼ˆ0=å¾…éªŒè¯ï¼Œ1=å·²é€šè¿‡ï¼Œ2=å·²æ‹’ç»ï¼Œ3=å·²æ‹‰é»‘ï¼‰
+ * fromRemark   â†’ VARCHAR(50)     â†’ std::stringï¼ˆå‘èµ·æ–¹å¯¹æ¥æ”¶æ–¹çš„å¤‡æ³¨ï¼‰
+ * toRemark     â†’ VARCHAR(50)     â†’ std::stringï¼ˆæ¥æ”¶æ–¹å¯¹å‘èµ·æ–¹çš„å¤‡æ³¨ï¼‰
+ * source       â†’ VARCHAR(30)     â†’ std::stringï¼ˆå¥½å‹æ¥æºï¼‰
+ * applyMsg     â†’ VARCHAR(200)    â†’ std::stringï¼ˆç”³è¯·æ¶ˆæ¯ï¼‰
+ * createTime   â†’ DATETIME        â†’ std::tmï¼ˆç”³è¯·æ—¶é—´ï¼‰
+ * updateTime   â†’ DATETIME        â†’ std::tmï¼ˆçŠ¶æ€æ›´æ–°æ—¶é—´ï¼‰
  */
 class FriendRelation {
 public:
-    // ºÃÓÑ×´Ì¬Ã¶¾Ù£¨ÓëÊı¾İ¿â status ×Ö¶Î¶ÔÓ¦£¬Ìá¸ß´úÂë¿É¶ÁĞÔ£©
+    // å¥½å‹çŠ¶æ€æšä¸¾ï¼ˆä¸æ•°æ®åº“ status å­—æ®µå¯¹åº”ï¼Œæé«˜ä»£ç å¯è¯»æ€§ï¼‰
     enum class RelationStatus : uint8_t {
-        PENDING = 0,    // ´ıÑéÖ¤
-        ACCEPTED = 1,   // ÒÑÍ¨¹ı£¨ºÃÓÑ£©
-        REJECTED = 2,   // ÒÑ¾Ü¾ø
-        BLOCKED = 3,     // ÒÑÀ­ºÚ
-		HASREAD = 4 ,     //ÒÑ¶Á
-		HASDEL = 5      //ÒÑÉ¾³ı
+        PENDING = 0,    // å¾…éªŒè¯
+        ACCEPTED = 1,   // å·²é€šè¿‡ï¼ˆå¥½å‹ï¼‰
+        REJECTED = 2,   // å·²æ‹’ç»
+        BLOCKED = 3,     // å·²æ‹‰é»‘
+		HASREAD = 4 ,     //å·²è¯»
+		HASDEL = 5,      //å·²åˆ é™¤
+        EXPIRED = 6
     };
 
-    // 1. Ä¬ÈÏ¹¹Ôìº¯Êı
+    // 1. é»˜è®¤æ„é€ å‡½æ•°
     FriendRelation();
 
-    // 2. ´ø²ÎÊı¹¹Ôìº¯Êı£¨¿ìËÙ³õÊ¼»¯ËùÓĞ×Ö¶Î£©
+    // 2. å¸¦å‚æ•°æ„é€ å‡½æ•°ï¼ˆå¿«é€Ÿåˆå§‹åŒ–æ‰€æœ‰å­—æ®µï¼‰
     FriendRelation(uint64_t id, std::string fromUserId, std::string toUserId,
         RelationStatus status, const std::string& fromRemark,
         const std::string& toRemark, const std::string& source,
         const std::string& applyMsg, const uint64_t& createTime,
         const uint64_t& updateTime);
 
-    // 3. ¿½±´¹¹Ôìº¯Êı
+    // 3. æ‹·è´æ„é€ å‡½æ•°
     FriendRelation(const FriendRelation& other);
 
-    // 4. ¸³ÖµÔËËã·ûÖØÔØ
+    // 4. èµ‹å€¼è¿ç®—ç¬¦é‡è½½
     FriendRelation& operator=(const FriendRelation& other);
 
-    // 5. Îö¹¹º¯Êı
+    // 5. ææ„å‡½æ•°
     ~FriendRelation() = default;
 
-    // -------------------------- Getter º¯Êı --------------------------
+    // -------------------------- Getter å‡½æ•° --------------------------
     uint64_t getId() const;
     std::string getFromUserId() const;
     std::string getToUserId() const;
-    RelationStatus getStatus() const;          // ·µ»ØÃ¶¾ÙÀàĞÍ£¬¸üÖ±¹Û
-    uint8_t getStatusAsUInt8() const;          // ¸¨Öú£º·µ»Øuint8_tÀàĞÍ£¨Êı¾İ¿â´æ´¢ÓÃ£©
-    const std::string& getFromRemark() const;  // ·¢Æğ·½¡ú½ÓÊÕ·½µÄ±¸×¢
-    const std::string& getToRemark() const;    // ½ÓÊÕ·½¡ú·¢Æğ·½µÄ±¸×¢
+    RelationStatus getStatus() const;          // è¿”å›æšä¸¾ç±»å‹ï¼Œæ›´ç›´è§‚
+    uint8_t getStatusAsUInt8() const;          // è¾…åŠ©ï¼šè¿”å›uint8_tç±»å‹ï¼ˆæ•°æ®åº“å­˜å‚¨ç”¨ï¼‰
+    const std::string& getFromRemark() const;  // å‘èµ·æ–¹â†’æ¥æ”¶æ–¹çš„å¤‡æ³¨
+    const std::string& getToRemark() const;    // æ¥æ”¶æ–¹â†’å‘èµ·æ–¹çš„å¤‡æ³¨
     const std::string& getSource() const;
     const std::string& getApplyMsg() const;
     const uint64_t& getCreateTime() const;
     const uint64_t& getUpdateTime() const;
 
-    // -------------------------- Setter º¯Êı --------------------------
+    // -------------------------- Setter å‡½æ•° --------------------------
     void setId(uint64_t id);
-    void setFromUserId(std::string fromUserId);   // Ğ£Ñé£ºÓÃ»§ID²»ÄÜÎª0
-    void setToUserId(std::string toUserId);       // Ğ£Ñé£ºÓÃ»§ID²»ÄÜÎª0£¬ÇÒ²»ÄÜÓë·¢Æğ·½IDÏàÍ¬
-    void setStatus(RelationStatus status);     // ÉèÖÃ×´Ì¬£¬×Ô¶¯¸üĞÂupdateTime
-    void setStatus(uint8_t status);            // ÖØÔØ£ºÖ§³ÖÖ±½Ó´«Èëuint8_t£¨Êı¾İ¿â¶ÁÈ¡ÓÃ£©
-    void setFromRemark(const std::string& fromRemark);  // Ğ£Ñé³¤¶È¡Ü50
-    void setToRemark(const std::string& toRemark);      // Ğ£Ñé³¤¶È¡Ü50
-    void setSource(const std::string& source);          // Ğ£Ñé³¤¶È¡Ü30
-    void setApplyMsg(const std::string& applyMsg);      // Ğ£Ñé³¤¶È¡Ü200
+    void setFromUserId(std::string fromUserId);   // æ ¡éªŒï¼šç”¨æˆ·IDä¸èƒ½ä¸º0
+    void setToUserId(std::string toUserId);       // æ ¡éªŒï¼šç”¨æˆ·IDä¸èƒ½ä¸º0ï¼Œä¸”ä¸èƒ½ä¸å‘èµ·æ–¹IDç›¸åŒ
+    void setStatus(RelationStatus status);     // è®¾ç½®çŠ¶æ€ï¼Œè‡ªåŠ¨æ›´æ–°updateTime
+    void setStatus(uint8_t status);            // é‡è½½ï¼šæ”¯æŒç›´æ¥ä¼ å…¥uint8_tï¼ˆæ•°æ®åº“è¯»å–ç”¨ï¼‰
+    void setFromRemark(const std::string& fromRemark);  // æ ¡éªŒé•¿åº¦â‰¤50
+    void setToRemark(const std::string& toRemark);      // æ ¡éªŒé•¿åº¦â‰¤50
+    void setSource(const std::string& source);          // æ ¡éªŒé•¿åº¦â‰¤30
+    void setApplyMsg(const std::string& applyMsg);      // æ ¡éªŒé•¿åº¦â‰¤200
     void setCreateTime(const uint64_t& createTime);
-    void setCreateTimeNow();                   // ±ã½İ£ºÉèÖÃÉêÇëÊ±¼äÎªµ±Ç°Ê±¼ä
+    void setCreateTimeNow();                   // ä¾¿æ·ï¼šè®¾ç½®ç”³è¯·æ—¶é—´ä¸ºå½“å‰æ—¶é—´
     void setUpdateTime(const uint64_t& updateTime);
-    void setUpdateTimeNow();                   // ±ã½İ£ºÉèÖÃ¸üĞÂÊ±¼äÎªµ±Ç°Ê±¼ä
+    void setUpdateTimeNow();                   // ä¾¿æ·ï¼šè®¾ç½®æ›´æ–°æ—¶é—´ä¸ºå½“å‰æ—¶é—´
 
-    // -------------------------- ¸¨Öúº¯Êı --------------------------
-    std::string toString() const;              // ¶ÔÏó×ª×Ö·û´®£¨µ÷ÊÔÓÃ£©
-    std::string getStatusDesc() const;         // »ñÈ¡×´Ì¬ÃèÊö£¨Èç"ÒÑÍ¨¹ı"£©
+    // -------------------------- è¾…åŠ©å‡½æ•° --------------------------
+    std::string toString() const;              // å¯¹è±¡è½¬å­—ç¬¦ä¸²ï¼ˆè°ƒè¯•ç”¨ï¼‰
+    std::string getStatusDesc() const;         // è·å–çŠ¶æ€æè¿°ï¼ˆå¦‚"å·²é€šè¿‡"ï¼‰
 
 private:
-    // ³ÉÔ±±äÁ¿£¨ÍÕ·åÃüÃû£¬ÓëÊı¾İ¿â×Ö¶ÎÒ»Ò»¶ÔÓ¦£©
-    uint64_t id;               // ºÃÓÑ¹ØÏµID
-    std::string fromUserId;       // ·¢ÆğºÃÓÑÇëÇóµÄÓÃ»§ID
-    std::string toUserId;         // ½ÓÊÕºÃÓÑÇëÇóµÄÓÃ»§ID
-    RelationStatus status;     // ºÃÓÑ×´Ì¬£¨Ã¶¾ÙÀàĞÍ£©
-    std::string fromRemark;    // ·¢Æğ·½¶Ô½ÓÊÕ·½µÄ±¸×¢
-    std::string toRemark;      // ½ÓÊÕ·½¶Ô·¢Æğ·½µÄ±¸×¢
-    std::string source;        // ºÃÓÑÀ´Ô´£¨Èç"ËÑË÷Ìí¼Ó"£©
-    std::string applyMsg;      // ÉêÇëºÃÓÑÊ±µÄÑéÖ¤ÏûÏ¢
-    uint64_t createTime;        // ÉêÇëÊ±¼ä
-    uint64_t updateTime;        // ×´Ì¬¸üĞÂÊ±¼ä
+    // æˆå‘˜å˜é‡ï¼ˆé©¼å³°å‘½åï¼Œä¸æ•°æ®åº“å­—æ®µä¸€ä¸€å¯¹åº”ï¼‰
+    uint64_t id;               // å¥½å‹å…³ç³»ID
+    std::string fromUserId;       // å‘èµ·å¥½å‹è¯·æ±‚çš„ç”¨æˆ·ID
+    std::string toUserId;         // æ¥æ”¶å¥½å‹è¯·æ±‚çš„ç”¨æˆ·ID
+    RelationStatus status;     // å¥½å‹çŠ¶æ€ï¼ˆæšä¸¾ç±»å‹ï¼‰
+    std::string fromRemark;    // å‘èµ·æ–¹å¯¹æ¥æ”¶æ–¹çš„å¤‡æ³¨
+    std::string toRemark;      // æ¥æ”¶æ–¹å¯¹å‘èµ·æ–¹çš„å¤‡æ³¨
+    std::string source;        // å¥½å‹æ¥æºï¼ˆå¦‚"æœç´¢æ·»åŠ "ï¼‰
+    std::string applyMsg;      // ç”³è¯·å¥½å‹æ—¶çš„éªŒè¯æ¶ˆæ¯
+    uint64_t createTime;        // ç”³è¯·æ—¶é—´
+    uint64_t updateTime;        // çŠ¶æ€æ›´æ–°æ—¶é—´
 };
 
 #endif // FRIEND_RELATION_H

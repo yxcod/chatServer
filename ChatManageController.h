@@ -48,6 +48,11 @@ public:
         uint8_t role,
         const std::string& operatorId);
 
+    static void notifyFriendRequestUpdated(
+        const std::vector<std::string>& userIds,
+        const Json::Value& request,
+        const std::string& action);
+
     // WebSocketController 接口实现
     void handleNewConnection(const HttpRequestPtr& req,
         const WebSocketConnectionPtr& conn) override;
