@@ -217,7 +217,10 @@ bool markPrivacyMessageRead(const Json::Value& jsonMsg,
 
     if (state.isGroup && allRead)
     {
-        sendPrivacyDestroy(state, {state.senderId}, "all_read");
+        // Keep the all-read state visible to the sender for two seconds.
+        app().getLoop()->runAfter(2.0, [state]() {
+            sendPrivacyDestroy(state, {state.senderId}, "all_read");
+        });
     }
     return true;
 }
