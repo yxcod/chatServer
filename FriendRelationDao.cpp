@@ -187,6 +187,29 @@ int FriendRelationDao::updateFriendApplyStatus(const int& relationId, const int&
     }
 }
 
+int FriendRelationDao::deleteExpiredFriendApply(
+    uint64_t relationId, const std::string& userId) const
+{
+    try
+    {
+        auto con = Logger::GetInstance().createConnection();
+        std::unique_ptr<sql::PreparedStatement> pstmt(con->prepareStatement(
+            "DELETE FROM friendrelation WHERE id = ? AND status = 6 "
+            "AND (fromUserId = ? OR toUserId = ?)"));
+        pstmt->setUInt64(1, relationId);
+        pstmt->setString(2, userId);
+        pstmt->setString(3, userId);
+        return pstmt->executeUpdate();
+    }
+    catch (const std::exception& error)
+    {
+        Logger::GetInstance().error(
+            std::string("Failed to delete expired friend application: ") +
+            error.what());
+        return 0;
+    }
+}
+
 int FriendRelationDao::deleteFriendRelation(const std::string& userId1, const std::string& userId2) const
 {
     std::string updateSql =

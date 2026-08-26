@@ -16,6 +16,9 @@ public:
 	int insertFriendApply(const FriendRelation& friendRelation) const;
 	//更新好友申请状态 传入唯一ID和状态值
 	int updateFriendApplyStatus(const int& relationId, const int& state) const;
+	// 删除当前用户可见且已经过期的好友申请。
+	int deleteExpiredFriendApply(
+		uint64_t relationId, const std::string& userId) const;
 	//删除好友关系
 	int deleteFriendRelation(const std::string& userId1, const std::string& userId2) const;
 	// Return incoming and outgoing application records visible to the user.

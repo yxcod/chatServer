@@ -210,7 +210,9 @@ Json::Value FriendRelationService::modifyFriendApplyState(const Json::Value& jso
 	int requestResult = jsonValue["requestResult"].asInt();
 	std::string userName = jsonValue["userName"].asString();
 	FriendRelation relation = friendRelationDao.getFriendRelationById(requestId);
-	if (relation.getId() == 0 || relation.getToUserId() != userName)
+	if (relation.getId() == 0 ||
+		(relation.getFromUserId() != userName &&
+			relation.getToUserId() != userName))
 	{
 		jsonObj["code"] = 403;
 		return jsonObj;
@@ -218,6 +220,24 @@ Json::Value FriendRelationService::modifyFriendApplyState(const Json::Value& jso
 	friendRelationDao.getFriendApplyListForUser(
 		userName, Logger::GetInstance().getcurrentTime());
 	relation = friendRelationDao.getFriendRelationById(requestId);
+	if (requestResult ==
+		static_cast<int>(FriendRelation::RelationStatus::HASDEL))
+	{
+		if (relation.getStatus() != FriendRelation::RelationStatus::EXPIRED)
+		{
+			jsonObj["code"] = 104;
+			jsonObj["request"] = requestPayload(relation);
+			return jsonObj;
+		}
+		jsonObj["code"] = friendRelationDao.deleteExpiredFriendApply(
+			requestId, userName) > 0 ? 100 : 101;
+		return jsonObj;
+	}
+	if (relation.getToUserId() != userName)
+	{
+		jsonObj["code"] = 403;
+		return jsonObj;
+	}
 	if (relation.getStatus() != FriendRelation::RelationStatus::PENDING)
 	{
 		jsonObj["code"] = 104;
