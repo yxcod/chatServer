@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS `userSpace` (
   PRIMARY KEY (`ownerUserName`)
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
+  COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS `spaceGuestbookMessage` (
   `messageId` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -23,4 +23,4 @@ CREATE TABLE IF NOT EXISTS `spaceGuestbookMessage` (
   KEY `idx_space_guestbook_author` (`authorUserName`, `status`, `createdAt`)
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4
-  COLLATE=utf8mb4_unicode_ci;
+  COLLATE=utf8mb4_0900_ai_ci;

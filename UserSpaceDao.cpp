@@ -47,7 +47,8 @@ SpaceGuestbookMessageModel getMessage(sql::Connection* connection,
             "COALESCE(NULLIF(u.nickName, ''), m.authorUserName) AS authorNickName, "
             "COALESCE(u.avatar, '') AS authorAvatar "
             "FROM spaceGuestbookMessage m LEFT JOIN userinfo u "
-            "ON u.userName = m.authorUserName WHERE m.messageId = ? "
+            "ON BINARY u.userName = BINARY m.authorUserName "
+            "WHERE m.messageId = ? "
             "AND m.status = 0 LIMIT 1"));
     statement->setUInt64(1, messageId);
     std::unique_ptr<sql::ResultSet> result(statement->executeQuery());
@@ -110,7 +111,8 @@ std::vector<SpaceGuestbookMessageModel> UserSpaceDao::listMessages(
             "COALESCE(NULLIF(u.nickName, ''), m.authorUserName) AS authorNickName, "
             "COALESCE(u.avatar, '') AS authorAvatar "
             "FROM spaceGuestbookMessage m LEFT JOIN userinfo u "
-            "ON u.userName = m.authorUserName WHERE m.ownerUserName = ? "
+            "ON BINARY u.userName = BINARY m.authorUserName "
+            "WHERE m.ownerUserName = ? "
             "AND m.status = 0 ORDER BY m.messageId DESC LIMIT ?"));
     statement->setString(1, ownerUserName);
     statement->setUInt(2, limit);
