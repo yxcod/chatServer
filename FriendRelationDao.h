@@ -34,7 +34,7 @@ public:
 	std::string getFriendRemark(const std::string& userId1, const std::string& userId2) const;
 	//根据两个用户ID修改好友备注（无顺序），返回受影响行数
 	int updateFriendRemark(const std::string& userId1, const std::string& userId2, const std::string& remark) const;
-	//获取某用户最近的同意的好友申请记录（3天内）
+	// 获取某用户最近三天内已同意或已拒绝的好友申请记录。
 	std::vector<FriendRelation> getRecentFriendApplyByUser(const std::string& userName, const uint64_t& nowTs) const;
 
 };

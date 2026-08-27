@@ -264,7 +264,7 @@ std::vector<FriendRelation> FriendRelationDao::getFriendApplyListForUser(
             con->prepareStatement(
                 "SELECT * FROM friendrelation "
                 "WHERE (fromUserId = ? OR toUserId = ?) "
-                "AND status IN (0, 2, 6) "
+                "AND status IN (0, 6) "
                 "ORDER BY updateTime DESC, id DESC LIMIT 100"));
         pstmt->setString(1, userId);
         pstmt->setString(2, userId);
@@ -546,10 +546,14 @@ std::vector<FriendRelation> FriendRelationDao::getRecentFriendApplyByUser(const 
 {
     std::vector<FriendRelation> relations;
 
+    const uint64_t recentWindow = 3ULL * 24ULL * 60ULL * 60ULL * 1000ULL;
+    const uint64_t cutoff = nowTs > recentWindow ? nowTs - recentWindow : 0;
+
     std::string selectSql =
         "SELECT * FROM friendrelation "
         "WHERE (fromUserId = ? OR toUserId = ?) "
-        "  AND status = 1 "
+        "  AND status IN (1, 2) "
+        "  AND updateTime >= ? "
         "ORDER BY updateTime DESC, id DESC LIMIT 50";
 
     auto con = Logger::GetInstance().createConnection();
@@ -562,6 +566,7 @@ std::vector<FriendRelation> FriendRelationDao::getRecentFriendApplyByUser(const 
             con->prepareStatement(selectSql));
         pstmt->setString(1, userName);
         pstmt->setString(2, userName);
+        pstmt->setUInt64(3, cutoff);
 
         res.reset(pstmt->executeQuery());
         while (res->next())

@@ -305,27 +305,28 @@ Json::Value FriendRelationService::updateFriendRemark(const Json::Value& jsonVal
 Json::Value FriendRelationService::getRecentAgreedFriendApply(const Json::Value& jsonValue) const
 {
 	Json::Value jsonObj;
-	jsonObj["code"] = 101;
+	jsonObj["code"] = 100;
 	FriendRelationDao friendRelationDao;
 	std::string fromUserName = jsonValue["userName"].asString();
 	std::vector<FriendRelation> friendApplyList = friendRelationDao.getRecentFriendApplyByUser(fromUserName, Logger::GetInstance().getcurrentTime());
 	Json::Value FriendListArr(Json::arrayValue);
-	jsonObj["recentFriendsList"] = FriendListArr;
 	for (const auto& friendInfo : friendApplyList)
 	{
-		jsonObj["code"] = 100;
+		Json::Value jsonfriendObj = requestPayload(friendInfo);
+		const bool incoming = friendInfo.getToUserId() == fromUserName;
 		const std::string counterpart = friendInfo.getFromUserId() == fromUserName
 			? friendInfo.getToUserId() : friendInfo.getFromUserId();
 		UserInfoDao userInfoDao;
 		UserInfo userInfo = userInfoDao.getUserinfo(counterpart);
-		Json::Value jsonfriendObj;
+		jsonfriendObj["direction"] = incoming ? "incoming" : "outgoing";
 		jsonfriendObj["userName"] = counterpart;
 		jsonfriendObj["addTime"] = Json::UInt64(friendInfo.getUpdateTime());
 		jsonfriendObj["nickName"] = userInfo.getNickName();
-		//这里用ToUserId来代替发起用户的昵称
 		jsonfriendObj["remarks"] = userInfo.getNickName();
 		FriendListArr.append(jsonfriendObj);
 	}
+	jsonObj["recentMessagesList"] = FriendListArr;
+	// Keep the original response key for clients that have not upgraded yet.
 	jsonObj["recentFriendsList"] = FriendListArr;
 	return jsonObj;
 }
