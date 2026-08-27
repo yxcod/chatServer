@@ -242,6 +242,7 @@ MerchantReviewEntryModel MerchantReviewDao::addComment(
     std::uint64_t entryId,
     const std::string& userName,
     const std::string& content,
+    const std::string& imageName,
     std::uint64_t now) const
 {
     auto pooled = DatabaseConnectionPool::instance().acquire();
@@ -254,18 +255,20 @@ MerchantReviewEntryModel MerchantReviewDao::addComment(
         comment.setEntryId(entryId);
         comment.setUserName(userName);
         comment.setContent(content);
+        comment.setImageName(imageName);
         comment.setCreatedAt(now);
         comment.setUpdatedAt(now);
         std::unique_ptr<sql::PreparedStatement> insertStatement(
             connection->prepareStatement(
                 "INSERT INTO merchantReviewComment "
-                "(entryId, userName, content, status, createdAt, updatedAt) "
-                "VALUES (?, ?, ?, 0, ?, ?)"));
+                "(entryId, userName, content, imageName, status, createdAt, updatedAt) "
+                "VALUES (?, ?, ?, ?, 0, ?, ?)"));
         insertStatement->setUInt64(1, comment.getEntryId());
         insertStatement->setString(2, comment.getUserName());
         insertStatement->setString(3, comment.getContent());
-        insertStatement->setUInt64(4, comment.getCreatedAt());
-        insertStatement->setUInt64(5, comment.getUpdatedAt());
+        insertStatement->setString(4, comment.getImageName());
+        insertStatement->setUInt64(5, comment.getCreatedAt());
+        insertStatement->setUInt64(6, comment.getUpdatedAt());
         insertStatement->executeUpdate();
 
         std::unique_ptr<sql::PreparedStatement> countStatement(
@@ -333,11 +336,12 @@ std::vector<MerchantReviewCommentModel> MerchantReviewDao::getComments(
 {
     std::unique_ptr<sql::PreparedStatement> statement(
         connection->prepareStatement(
-            "SELECT c.commentId, c.entryId, c.userName, c.content, c.status, "
+            "SELECT c.commentId, c.entryId, c.userName, c.content, c.imageName, c.status, "
             "c.createdAt, c.updatedAt, c.deletedAt, "
             "COALESCE(NULLIF(u.nickName, ''), c.userName) AS displayName "
             "FROM merchantReviewComment c LEFT JOIN userinfo u "
-            "ON u.userName = c.userName WHERE c.entryId = ? AND c.status = 0 "
+            "ON BINARY u.userName = BINARY c.userName "
+            "WHERE c.entryId = ? AND c.status = 0 "
             "ORDER BY c.createdAt ASC"));
     statement->setUInt64(1, entryId);
     std::unique_ptr<sql::ResultSet> result(statement->executeQuery());
@@ -349,6 +353,7 @@ std::vector<MerchantReviewCommentModel> MerchantReviewDao::getComments(
         comment.setEntryId(result->getUInt64("entryId"));
         comment.setUserName(result->getString("userName").asStdString());
         comment.setContent(result->getString("content").asStdString());
+        comment.setImageName(result->getString("imageName").asStdString());
         comment.setStatus(static_cast<std::uint8_t>(result->getUInt("status")));
         comment.setCreatedAt(result->getUInt64("createdAt"));
         comment.setUpdatedAt(result->getUInt64("updatedAt"));

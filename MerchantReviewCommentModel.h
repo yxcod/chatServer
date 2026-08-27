@@ -11,6 +11,7 @@ public:
     std::uint64_t getEntryId() const noexcept { return entryId_; }
     const std::string& getUserName() const noexcept { return userName_; }
     const std::string& getContent() const noexcept { return content_; }
+    const std::string& getImageName() const noexcept { return imageName_; }
     std::uint8_t getStatus() const noexcept { return status_; }
     std::uint64_t getCreatedAt() const noexcept { return createdAt_; }
     std::uint64_t getUpdatedAt() const noexcept { return updatedAt_; }
@@ -21,6 +22,7 @@ public:
     void setEntryId(std::uint64_t value) noexcept { entryId_ = value; }
     void setUserName(std::string value) { userName_ = std::move(value); }
     void setContent(std::string value) { content_ = std::move(value); }
+    void setImageName(std::string value) { imageName_ = std::move(value); }
     void setStatus(std::uint8_t value) noexcept { status_ = value; }
     void setCreatedAt(std::uint64_t value) noexcept { createdAt_ = value; }
     void setUpdatedAt(std::uint64_t value) noexcept { updatedAt_ = value; }
@@ -32,6 +34,7 @@ private:
     std::uint64_t entryId_{0};
     std::string userName_;
     std::string content_;
+    std::string imageName_;
     std::uint8_t status_{0};
     std::uint64_t createdAt_{0};
     std::uint64_t updatedAt_{0};

@@ -44,6 +44,14 @@ std::size_t utf8CharacterCount(const std::string& value)
         }));
 }
 
+bool safeImageName(const std::string& value)
+{
+    return value.empty() ||
+           (value.size() <= 255 && value.find('/') == std::string::npos &&
+            value.find('\\') == std::string::npos &&
+            value.find("..") == std::string::npos);
+}
+
 std::uint64_t currentTimeMillis()
 {
     using namespace std::chrono;
@@ -104,6 +112,7 @@ Json::Value commentToJson(const MerchantReviewCommentModel& comment)
     value["userId"] = comment.getUserName();
     value["displayName"] = comment.getDisplayName();
     value["content"] = comment.getContent();
+    value["imageName"] = comment.getImageName();
     value["createdAt"] = Json::UInt64(comment.getCreatedAt());
     return value;
 }
@@ -296,10 +305,12 @@ Json::Value MerchantReviewService::addComment(
     {
         const auto entryId = readUInt64(request["entryId"]);
         const std::string content = trim(request.get("content", "").asString());
-        if (entryId == 0 || content.empty() || utf8CharacterCount(content) > 500)
+        const std::string imageName = trim(request.get("imageName", "").asString());
+        if (entryId == 0 || (content.empty() && imageName.empty()) ||
+            utf8CharacterCount(content) > 500 || !safeImageName(imageName))
             return response(101, "Invalid comment");
         return successWithData(entryToJson(MerchantReviewDao().addComment(
-            entryId, userName, content, currentTimeMillis())));
+            entryId, userName, content, imageName, currentTimeMillis())));
     }
     catch (const std::exception& error)
     {
