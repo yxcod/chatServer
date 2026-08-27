@@ -9,6 +9,7 @@
 #include"FriendController.h"
 #include"GroupController.h"
 #include "MomentController.h"
+#include "MerchantReviewController.h"
 #include "GroupResourceController.h"
 #include "UserLocationController.h"
 #include "VoiceTranscriptionController.h"
