@@ -307,3 +307,23 @@ Json::Value MerchantReviewService::addComment(
         return response(102, "Failed to add merchant review comment");
     }
 }
+
+Json::Value MerchantReviewService::removeEntry(
+    const std::string& userName,
+    const Json::Value& request) const
+{
+    try
+    {
+        const auto entryId = readUInt64(request["entryId"]);
+        if (entryId == 0) return response(101, "Invalid entry id");
+        MerchantReviewDao().removeEntry(entryId, userName);
+        Json::Value data(Json::objectValue);
+        data["entryId"] = Json::UInt64(entryId);
+        return successWithData(std::move(data));
+    }
+    catch (const std::exception& error)
+    {
+        std::cerr << "Remove merchant review failed: " << error.what() << '\n';
+        return response(102, "Failed to remove merchant review");
+    }
+}

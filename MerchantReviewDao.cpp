@@ -290,6 +290,22 @@ MerchantReviewEntryModel MerchantReviewDao::addComment(
     }
 }
 
+void MerchantReviewDao::removeEntry(
+    std::uint64_t entryId,
+    const std::string& ownerUserName) const
+{
+    auto pooled = DatabaseConnectionPool::instance().acquire();
+    sql::Connection* connection = pooled.operator->();
+    std::unique_ptr<sql::PreparedStatement> statement(
+        connection->prepareStatement(
+            "DELETE FROM merchantReviewEntry "
+            "WHERE entryId = ? AND ownerUserName = ?"));
+    statement->setUInt64(1, entryId);
+    statement->setString(2, ownerUserName);
+    if (statement->executeUpdate() == 0)
+        throw std::runtime_error("Merchant review not found or not owned");
+}
+
 MerchantReviewEntryModel MerchantReviewDao::getEntry(
     sql::Connection* connection,
     std::uint64_t entryId,

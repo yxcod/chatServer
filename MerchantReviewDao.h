@@ -24,6 +24,8 @@ public:
                                         const std::string& userName,
                                         const std::string& content,
                                         std::uint64_t now) const;
+    void removeEntry(std::uint64_t entryId,
+                     const std::string& ownerUserName) const;
 
 private:
     MerchantReviewEntryModel getEntry(sql::Connection* connection,
