@@ -184,6 +184,8 @@
     </ClCompile>
     <ClCompile Include="LoginDao.cpp" />
     <ClCompile Include="LoginModel.cpp" />
+    <ClCompile Include="MerchantReviewDao.cpp" />
+    <ClCompile Include="MerchantReviewService.cpp" />
     <ClCompile Include="MomentDao.cpp" />
     <ClCompile Include="MomentService.cpp" />
     <ClCompile Include="ProxyController.cpp" />
@@ -253,6 +255,12 @@
     <ClInclude Include="Logger.h" />
     <ClInclude Include="LoginDao.h" />
     <ClInclude Include="LoginModel.h" />
+    <ClInclude Include="MerchantReviewCommentModel.h" />
+    <ClInclude Include="MerchantReviewController.h" />
+    <ClInclude Include="MerchantReviewDao.h" />
+    <ClInclude Include="MerchantReviewEntryModel.h" />
+    <ClInclude Include="MerchantReviewReactionModel.h" />
+    <ClInclude Include="MerchantReviewService.h" />
     <ClInclude Include="MomentController.h" />
     <ClInclude Include="MomentCommentModel.h" />
     <ClInclude Include="MomentDao.h" />

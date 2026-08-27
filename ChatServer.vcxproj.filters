@@ -47,6 +47,12 @@
     <ClInclude Include="LoginModel.h">
       <Filter>源文件\Model</Filter>
     </ClInclude>
+    <ClInclude Include="MerchantReviewCommentModel.h"><Filter>源文件\Model</Filter></ClInclude>
+    <ClInclude Include="MerchantReviewController.h"><Filter>源文件\Control</Filter></ClInclude>
+    <ClInclude Include="MerchantReviewDao.h"><Filter>源文件\Mapper</Filter></ClInclude>
+    <ClInclude Include="MerchantReviewEntryModel.h"><Filter>源文件\Model</Filter></ClInclude>
+    <ClInclude Include="MerchantReviewReactionModel.h"><Filter>源文件\Model</Filter></ClInclude>
+    <ClInclude Include="MerchantReviewService.h"><Filter>源文件\Service</Filter></ClInclude>
     <ClInclude Include="MomentController.h" />
     <ClInclude Include="MomentCommentModel.h">
       <Filter>源文件\Model</Filter>
@@ -202,6 +208,8 @@
     </ClCompile>
     <ClCompile Include="MomentDao.cpp" />
     <ClCompile Include="MomentService.cpp" />
+    <ClCompile Include="MerchantReviewDao.cpp"><Filter>源文件\Mapper</Filter></ClCompile>
+    <ClCompile Include="MerchantReviewService.cpp"><Filter>源文件\Service</Filter></ClCompile>
     <ClCompile Include="GroupResourceController.cpp"><Filter>源文件\Control</Filter></ClCompile>
     <ClCompile Include="GroupResourceDao.cpp"><Filter>源文件\Mapper</Filter></ClCompile>
     <ClCompile Include="UserLocationController.cpp"><Filter>源文件\Control</Filter></ClCompile>
