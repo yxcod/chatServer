@@ -1,0 +1,104 @@
+#pragma once
+
+#include <functional>
+#include <optional>
+#include <string>
+#include <utility>
+
+#include <drogon/HttpController.h>
+
+#include "JwtTokenUtil.h"
+#include "UserSpaceService.h"
+
+class UserSpaceController : public drogon::HttpController<UserSpaceController>
+{
+public:
+    METHOD_LIST_BEGIN
+        ADD_METHOD_TO(UserSpaceController::detail,
+                      "/api/space/detail", drogon::Post);
+        ADD_METHOD_TO(UserSpaceController::updateCover,
+                      "/api/space/updateCover", drogon::Post);
+        ADD_METHOD_TO(UserSpaceController::addMessage,
+                      "/api/space/message/add", drogon::Post);
+        ADD_METHOD_TO(UserSpaceController::deleteMessage,
+                      "/api/space/message/delete", drogon::Post);
+    METHOD_LIST_END
+
+    void detail(const drogon::HttpRequestPtr& request,
+                std::function<void(const drogon::HttpResponsePtr&)>&& callback)
+    {
+        handle(request, std::move(callback), &UserSpaceService::detail);
+    }
+
+    void updateCover(const drogon::HttpRequestPtr& request,
+                     std::function<void(const drogon::HttpResponsePtr&)>&& callback)
+    {
+        handle(request, std::move(callback), &UserSpaceService::updateCover);
+    }
+
+    void addMessage(const drogon::HttpRequestPtr& request,
+                    std::function<void(const drogon::HttpResponsePtr&)>&& callback)
+    {
+        handle(request, std::move(callback), &UserSpaceService::addMessage);
+    }
+
+    void deleteMessage(const drogon::HttpRequestPtr& request,
+                       std::function<void(const drogon::HttpResponsePtr&)>&& callback)
+    {
+        handle(request, std::move(callback), &UserSpaceService::deleteMessage);
+    }
+
+private:
+    using ServiceMethod = Json::Value (UserSpaceService::*)(
+        const std::string&, const Json::Value&) const;
+
+    static JwtTokenUtil& tokenUtil()
+    {
+        static JwtTokenUtil instance(
+            "c9bb708f526d420ea88d83cd316d662921646869efaf425eb150ab99d20f48bc");
+        return instance;
+    }
+
+    static std::optional<std::string> authenticatedUser(
+        const drogon::HttpRequestPtr& request)
+    {
+        auto token = tokenUtil().extractBearerToken(request);
+        if (!token || !tokenUtil().verifyToken(*token)) return std::nullopt;
+        const auto payload = tokenUtil().parsePayload(*token);
+        const auto user = payload.find("userId");
+        if (user == payload.end() || user->second.empty()) return std::nullopt;
+        return user->second;
+    }
+
+    static void handle(
+        const drogon::HttpRequestPtr& request,
+        std::function<void(const drogon::HttpResponsePtr&)>&& callback,
+        ServiceMethod method)
+    {
+        const auto userName = authenticatedUser(request);
+        if (!userName)
+        {
+            Json::Value body(Json::objectValue);
+            body["code"] = 401;
+            body["message"] = "Unauthorized";
+            auto response = drogon::HttpResponse::newHttpJsonResponse(body);
+            response->setStatusCode(drogon::k401Unauthorized);
+            callback(response);
+            return;
+        }
+        const auto json = request->getJsonObject();
+        if (!json)
+        {
+            Json::Value body(Json::objectValue);
+            body["code"] = 99;
+            body["message"] = "Invalid JSON body";
+            auto response = drogon::HttpResponse::newHttpJsonResponse(body);
+            response->setStatusCode(drogon::k400BadRequest);
+            callback(response);
+            return;
+        }
+        UserSpaceService service;
+        callback(drogon::HttpResponse::newHttpJsonResponse(
+            (service.*method)(*userName, *json)));
+    }
+};

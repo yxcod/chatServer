@@ -53,6 +53,11 @@
     <ClInclude Include="MerchantReviewEntryModel.h"><Filter>源文件\Model</Filter></ClInclude>
     <ClInclude Include="MerchantReviewReactionModel.h"><Filter>源文件\Model</Filter></ClInclude>
     <ClInclude Include="MerchantReviewService.h"><Filter>源文件\Service</Filter></ClInclude>
+    <ClInclude Include="SpaceGuestbookMessageModel.h"><Filter>源文件\Model</Filter></ClInclude>
+    <ClInclude Include="UserSpaceController.h"><Filter>源文件\Control</Filter></ClInclude>
+    <ClInclude Include="UserSpaceDao.h"><Filter>源文件\Mapper</Filter></ClInclude>
+    <ClInclude Include="UserSpaceModel.h"><Filter>源文件\Model</Filter></ClInclude>
+    <ClInclude Include="UserSpaceService.h"><Filter>源文件\Service</Filter></ClInclude>
     <ClInclude Include="MomentController.h" />
     <ClInclude Include="MomentCommentModel.h">
       <Filter>源文件\Model</Filter>
@@ -210,6 +215,8 @@
     <ClCompile Include="MomentService.cpp" />
     <ClCompile Include="MerchantReviewDao.cpp"><Filter>源文件\Mapper</Filter></ClCompile>
     <ClCompile Include="MerchantReviewService.cpp"><Filter>源文件\Service</Filter></ClCompile>
+    <ClCompile Include="UserSpaceDao.cpp"><Filter>源文件\Mapper</Filter></ClCompile>
+    <ClCompile Include="UserSpaceService.cpp"><Filter>源文件\Service</Filter></ClCompile>
     <ClCompile Include="GroupResourceController.cpp"><Filter>源文件\Control</Filter></ClCompile>
     <ClCompile Include="GroupResourceDao.cpp"><Filter>源文件\Mapper</Filter></ClCompile>
     <ClCompile Include="UserLocationController.cpp"><Filter>源文件\Control</Filter></ClCompile>

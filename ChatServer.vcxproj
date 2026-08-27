@@ -200,6 +200,8 @@
     </ClCompile>
     <ClCompile Include="UserLocationController.cpp" />
     <ClCompile Include="UserLocationDao.cpp" />
+    <ClCompile Include="UserSpaceDao.cpp" />
+    <ClCompile Include="UserSpaceService.cpp" />
     <ClCompile Include="TencentAsrService.cpp">
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -261,6 +263,7 @@
     <ClInclude Include="MerchantReviewEntryModel.h" />
     <ClInclude Include="MerchantReviewReactionModel.h" />
     <ClInclude Include="MerchantReviewService.h" />
+    <ClInclude Include="SpaceGuestbookMessageModel.h" />
     <ClInclude Include="MomentController.h" />
     <ClInclude Include="MomentCommentModel.h" />
     <ClInclude Include="MomentDao.h" />
@@ -277,6 +280,10 @@
     <ClInclude Include="UserInfoService.h" />
     <ClInclude Include="UserLoginService.h" />
     <ClInclude Include="UserModel.h" />
+    <ClInclude Include="UserSpaceController.h" />
+    <ClInclude Include="UserSpaceDao.h" />
+    <ClInclude Include="UserSpaceModel.h" />
+    <ClInclude Include="UserSpaceService.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
