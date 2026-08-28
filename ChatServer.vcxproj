@@ -189,6 +189,14 @@
     <ClCompile Include="MomentDao.cpp" />
     <ClCompile Include="MomentService.cpp" />
     <ClCompile Include="ProxyController.cpp" />
+    <ClCompile Include="PushDeviceController.cpp">
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="PushDeviceRegistrationDao.cpp" />
+    <ClCompile Include="PushDeviceRegistrationModel.cpp" />
+    <ClCompile Include="JPushService.cpp">
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="RangeUtils.cpp" />
     <ClCompile Include="UserInfoDao.cpp" />
     <ClCompile Include="UserInfoService.cpp" />
@@ -228,6 +236,10 @@
     <ClInclude Include="UserLocationDao.h" />
     <ClInclude Include="UserLocationModel.h" />
     <ClInclude Include="TencentAsrService.h" />
+    <ClInclude Include="PushDeviceController.h" />
+    <ClInclude Include="PushDeviceRegistrationDao.h" />
+    <ClInclude Include="PushDeviceRegistrationModel.h" />
+    <ClInclude Include="JPushService.h" />
     <ClInclude Include="VoiceTranscriptionController.h" />
     <ClInclude Include="VoiceTranscriptionDao.h" />
     <ClInclude Include="VoiceTranscriptionModel.h" />

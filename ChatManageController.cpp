@@ -1,6 +1,7 @@
 #include "ChatManageController.h"
 #include "FriendRelationDao.h"
 #include "HeartbeatManager.h"
+#include "JPushService.h"
 #include <algorithm>
 #include <filesystem>
 #include <unordered_set>
@@ -14,6 +15,17 @@ namespace
 {
 std::string jsonString(const Json::Value& value);
 int jsonInt(const Json::Value& value);
+
+std::string notificationBody(const Json::Value& message)
+{
+    const int type = jsonInt(message["msgType"]);
+    if (type == 1) return message["msgContent"].asString();
+    if (type == 2) return "[图片]";
+    if (type == 3) return "[语音]";
+    if (type == 4) return "[视频]";
+    if (type == 5) return "[文件]";
+    return "你收到了一条新消息";
+}
 
 struct PrivacyMessageState
 {
@@ -411,6 +423,27 @@ void ChatWSServer::notifyFriendRequestUpdated(
     std::unordered_set<std::string> uniqueUsers(
         userIds.begin(), userIds.end());
     sendToUsers(uniqueUsers, event);
+    if (action == "created")
+    {
+        Json::Value extras;
+        extras["eventType"] = "friendRequest";
+        extras["fromUserId"] = request["fromUserId"];
+        JPushService::pushToUsers(
+            {request["toUserId"].asString()}, "新的朋友",
+            request.get("applyMsg", "收到一条好友申请").asString(), extras);
+    }
+    else if (action == "accepted" || action == "rejected")
+    {
+        Json::Value extras;
+        extras["eventType"] = "friendRequestUpdated";
+        extras["action"] = action;
+        extras["fromUserId"] = request["fromUserId"];
+        JPushService::pushToUsers(
+            {request["fromUserId"].asString()}, "好友申请",
+            action == "accepted" ? "对方已同意你的好友申请"
+                                 : "对方已拒绝你的好友申请",
+            extras);
+    }
 }
 
 void ChatWSServer::notifyAutomaticFriendGreeting(
@@ -541,6 +574,13 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
 
         }
 		conn->send(chatService.messageDelivered(jsonMsg));
+        Json::Value pushExtras;
+        pushExtras["eventType"] = "privateMessage";
+        pushExtras["senderId"] = authenticatedUser;
+        pushExtras["sessionId"] = jsonMsg["sessionId"];
+        pushExtras["msgId"] = jsonMsg["msgId"];
+        JPushService::pushToUsers(
+            {receiveId}, "新消息", notificationBody(jsonMsg), pushExtras);
     }
     // 消息已读回执
     else if (msgType == "chatCallback")
@@ -732,6 +772,16 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
 		Json::Value acknowledgement = result;
 		acknowledgement["type"] = "groupChatCallback";
 		conn->send(jsonString(acknowledgement));
+        Json::Value pushExtras;
+        pushExtras["eventType"] = "groupMessage";
+        pushExtras["groupId"] = groupId;
+        pushExtras["senderId"] = sender;
+        pushExtras["msgId"] = result["msgId"];
+        std::vector<std::string> pushRecipients;
+        for (const auto& member : userIds)
+            if (member != sender) pushRecipients.push_back(member);
+        JPushService::pushToUsers(
+            pushRecipients, "群聊消息", notificationBody(result), pushExtras);
 		}
 		catch (const std::exception& e)
 		{

@@ -188,6 +188,10 @@
       <Filter>源文件\Tool</Filter>
     </ClInclude>
     <ClInclude Include="TencentAsrService.h"><Filter>源文件\Service</Filter></ClInclude>
+    <ClInclude Include="PushDeviceController.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="PushDeviceRegistrationDao.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="PushDeviceRegistrationModel.h"><Filter>头文件</Filter></ClInclude>
+    <ClInclude Include="JPushService.h"><Filter>源文件\Service</Filter></ClInclude>
     <ClInclude Include="VoiceTranscriptionController.h"><Filter>源文件\Control</Filter></ClInclude>
     <ClInclude Include="VoiceTranscriptionDao.h"><Filter>源文件\Mapper</Filter></ClInclude>
     <ClInclude Include="VoiceTranscriptionModel.h"><Filter>源文件\Model</Filter></ClInclude>
@@ -294,6 +298,10 @@
       <Filter>源文件\Mapper</Filter>
     </ClCompile>
     <ClCompile Include="TencentAsrService.cpp"><Filter>源文件\Service</Filter></ClCompile>
+    <ClCompile Include="PushDeviceController.cpp"><Filter>源文件</Filter></ClCompile>
+    <ClCompile Include="PushDeviceRegistrationDao.cpp"><Filter>源文件</Filter></ClCompile>
+    <ClCompile Include="PushDeviceRegistrationModel.cpp"><Filter>源文件</Filter></ClCompile>
+    <ClCompile Include="JPushService.cpp"><Filter>源文件\Service</Filter></ClCompile>
     <ClCompile Include="VoiceTranscriptionController.cpp"><Filter>源文件\Control</Filter></ClCompile>
     <ClCompile Include="VoiceTranscriptionDao.cpp"><Filter>源文件\Mapper</Filter></ClCompile>
   </ItemGroup>
