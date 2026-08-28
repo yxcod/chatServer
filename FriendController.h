@@ -78,19 +78,18 @@ public:
 			const auto& request = response_data["request"];
 			const std::string action = request["status"].asInt() == 1
 				? "accepted" : "rejected";
+			Json::Value realtimeRequest = request;
+			if (action == "accepted")
+			{
+				if (response_data["verificationMessage"].isObject())
+					realtimeRequest["verificationMessage"] =
+						response_data["verificationMessage"];
+				if (response_data["greeting"].isObject())
+					realtimeRequest["greeting"] = response_data["greeting"];
+			}
 			ChatWSServer::notifyFriendRequestUpdated(
 				{request["fromUserId"].asString(), request["toUserId"].asString()},
-				request, action);
-			if (action == "accepted" && response_data["greeting"].isObject())
-			{
-				// The applicant receives the acceptor's greeting in real time.
-				// The acceptor receives both persisted messages in this HTTP
-				// response and caches them locally without duplicate WebSocket
-				// echoes.
-				ChatWSServer::notifyAutomaticFriendGreeting(
-					request["fromUserId"].asString(),
-					response_data["greeting"]);
-			}
+				realtimeRequest, action);
 		}
 		callback(HttpResponse::newHttpJsonResponse(response_data));
 

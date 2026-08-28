@@ -121,7 +121,9 @@ Json::Value persistAutomaticFriendMessage(
 	{
 		Logger::GetInstance().error(
 			"Failed to persist automatic friend message for request " +
-			std::to_string(relation.getId()));
+			std::to_string(relation.getId()) + ", sender=" + senderId +
+			", recipient=" + recipientId + ", error=" +
+			insertResult["error"].asString());
 		return Json::Value();
 	}
 	message["sendTime"] = insertResult["sendTime"];
@@ -339,6 +341,15 @@ Json::Value FriendRelationService::modifyFriendApplyState(const Json::Value& jso
 		if (updatedRelation.getStatus() ==
 			FriendRelation::RelationStatus::ACCEPTED)
 		{
+			const std::string sessionId = privateSessionId(
+				updatedRelation.getFromUserId(),
+				updatedRelation.getToUserId());
+			if (!ChatDao().resetPrivateConversationForNewFriendship(sessionId))
+			{
+				Logger::GetInstance().error(
+					"Accepted friendship but failed to reset its private "
+					"conversation: " + sessionId);
+			}
 			const Json::Value acceptedMessages =
 				createAcceptedFriendMessages(updatedRelation);
 			if (acceptedMessages.isObject())

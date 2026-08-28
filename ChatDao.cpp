@@ -652,6 +652,68 @@ int ChatDao::deleteChatRecordsBetweenUsers(const std::string& sessionId) const
     }
 }
 
+bool ChatDao::resetPrivateConversationForNewFriendship(
+    const std::string& sessionId) const
+{
+    if (sessionId.empty()) return false;
+
+    auto con = Logger::GetInstance().createConnection();
+    if (!con) return false;
+    try
+    {
+        con->setAutoCommit(false);
+
+        std::unique_ptr<sql::PreparedStatement> recordsStmt(
+            con->prepareStatement(
+                "DELETE FROM chatrecord WHERE sessionId = ?"));
+        recordsStmt->setString(1, sessionId);
+        recordsStmt->executeUpdate();
+
+        std::unique_ptr<sql::PreparedStatement> conversationStmt(
+            con->prepareStatement(
+                "DELETE FROM conversations WHERE convId = ?"));
+        conversationStmt->setString(1, sessionId);
+        conversationStmt->executeUpdate();
+
+        std::unique_ptr<sql::PreparedStatement> visibilityStmt(
+            con->prepareStatement(
+                "DELETE FROM private_chat_history_visibility "
+                "WHERE conversationId = ?"));
+        visibilityStmt->setString(1, sessionId);
+        visibilityStmt->executeUpdate();
+
+        con->commit();
+        con->setAutoCommit(true);
+        return true;
+    }
+    catch (const std::exception& error)
+    {
+        try
+        {
+            con->rollback();
+            con->setAutoCommit(true);
+        }
+        catch (...) {}
+        Logger::GetInstance().error(
+            std::string("Failed to reset private conversation ") +
+            sessionId + " for renewed friendship: " + error.what());
+        return false;
+    }
+    catch (...)
+    {
+        try
+        {
+            con->rollback();
+            con->setAutoCommit(true);
+        }
+        catch (...) {}
+        Logger::GetInstance().error(
+            std::string("Failed to reset private conversation ") +
+            sessionId + " for renewed friendship: unknown error");
+        return false;
+    }
+}
+
 int ChatDao::updateMsgStatusByMsgId(uint64_t msgId, uint8_t msgStatus) const
 {
     std::string sql = "UPDATE chatrecord SET msgStatus = ? WHERE msgId = ?";

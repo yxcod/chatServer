@@ -38,6 +38,11 @@ public:
 
 	// 删除指定会话（sessionId）下的所有聊天记录，返回受影响行数
 	int deleteChatRecordsBetweenUsers(const std::string& sessionId) const;
+	// Starts a fresh private-chat lifecycle after a deleted friendship is
+	// accepted again. Old records, conversation state and per-user visibility
+	// cursors must not leak into the newly established friendship.
+	bool resetPrivateConversationForNewFriendship(
+		const std::string& sessionId) const;
 
 	// 隐藏请求者当前可见的历史，并物理删除双方都已删除的消息交集。
 	// 1=成功（包含重复删除），-1=无权限或会话参与者不匹配，0=数据库错误。
