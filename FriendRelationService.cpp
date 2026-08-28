@@ -92,36 +92,82 @@ uint64_t nextAutomaticMessageId()
 	return candidate;
 }
 
-Json::Value createAutomaticFriendGreeting(const FriendRelation& relation)
+Json::Value persistAutomaticFriendMessage(
+	const FriendRelation& relation,
+	const std::string& senderId,
+	const std::string& recipientId,
+	const std::string& content,
+	const Json::Value& extendInfo,
+	uint64_t sendTime)
 {
-	Json::Value greeting;
-	const std::string senderId = relation.getToUserId();
-	const std::string recipientId = relation.getFromUserId();
-	const uint64_t now = Logger::GetInstance().getcurrentTime();
-	greeting["msgId"] = Json::UInt64(nextAutomaticMessageId());
-	greeting["msgContent"] = u8"我们已经成功添加好友啦!";
-	greeting["sendUserId"] = senderId;
-	greeting["receiveId"] = recipientId;
-	greeting["sendTime"] = Json::UInt64(now);
-	greeting["readTime"] = Json::UInt64(0);
-	greeting["sessionId"] = privateSessionId(senderId, recipientId);
-	greeting["receiveType"] = 1;
-	greeting["msgType"] = 1;
-	greeting["msgStatus"] = 1;
-	greeting["extendInfo"] = "{}";
+	Json::Value message;
+	Json::StreamWriterBuilder writer;
+	writer["indentation"] = "";
+	message["msgId"] = Json::UInt64(nextAutomaticMessageId());
+	message["msgContent"] = content;
+	message["sendUserId"] = senderId;
+	message["receiveId"] = recipientId;
+	message["sendTime"] = Json::UInt64(sendTime);
+	message["readTime"] = Json::UInt64(0);
+	message["sessionId"] = privateSessionId(senderId, recipientId);
+	message["receiveType"] = 1;
+	message["msgType"] = 1;
+	message["msgStatus"] = 1;
+	message["extendInfo"] = Json::writeString(writer, extendInfo);
 
 	ChatService chatService;
-	const Json::Value insertResult = chatService.insertChatRecord(greeting);
+	const Json::Value insertResult = chatService.insertChatRecord(message);
 	if (insertResult["code"].asInt() != 100)
 	{
 		Logger::GetInstance().error(
-			"Failed to persist automatic friend greeting for request " +
+			"Failed to persist automatic friend message for request " +
 			std::to_string(relation.getId()));
 		return Json::Value();
 	}
-	greeting["sendTime"] = insertResult["sendTime"];
-	greeting["sessionId"] = insertResult["sessionId"];
-	return greeting;
+	message["sendTime"] = insertResult["sendTime"];
+	message["sessionId"] = insertResult["sessionId"];
+	return message;
+}
+
+Json::Value createAcceptedFriendMessages(const FriendRelation& relation)
+{
+	Json::Value messages;
+	const uint64_t now = Logger::GetInstance().getcurrentTime();
+	Json::Value verificationMetadata;
+	verificationMetadata["kind"] = "friend_verification";
+
+	const Json::Value verification = persistAutomaticFriendMessage(
+		relation,
+		relation.getFromUserId(),
+		relation.getToUserId(),
+		relation.getApplyMsg(),
+		verificationMetadata,
+		now);
+	if (!verification.isObject()) return messages;
+
+	// The recipient accepted this request from the request list, so the
+	// verification text must not create a fresh unread badge for them.
+	ChatDao chatDao;
+	chatDao.markPrivateMessageRead(
+		verification["msgId"].asUInt64(),
+		verification["sessionId"].asString(),
+		relation.getToUserId(),
+		relation.getFromUserId());
+	chatDao.resetUnreadCountForUser(
+		verification["sessionId"].asString(), relation.getToUserId());
+
+	const Json::Value greeting = persistAutomaticFriendMessage(
+		relation,
+		relation.getToUserId(),
+		relation.getFromUserId(),
+		u8"我们已经成功添加好友啦!",
+		Json::Value(Json::objectValue),
+		now + 1);
+	if (!greeting.isObject()) return messages;
+
+	messages["verification"] = verification;
+	messages["greeting"] = greeting;
+	return messages;
 }
 }
 
@@ -274,9 +320,14 @@ Json::Value FriendRelationService::modifyFriendApplyState(const Json::Value& jso
 		if (updatedRelation.getStatus() ==
 			FriendRelation::RelationStatus::ACCEPTED)
 		{
-			const Json::Value greeting =
-				createAutomaticFriendGreeting(updatedRelation);
-			if (greeting.isObject()) jsonObj["greeting"] = greeting;
+			const Json::Value acceptedMessages =
+				createAcceptedFriendMessages(updatedRelation);
+			if (acceptedMessages.isObject())
+			{
+				jsonObj["verificationMessage"] =
+					acceptedMessages["verification"];
+				jsonObj["greeting"] = acceptedMessages["greeting"];
+			}
 		}
 	}
 	return jsonObj;

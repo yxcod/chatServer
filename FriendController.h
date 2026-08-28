@@ -83,6 +83,10 @@ public:
 				request, action);
 			if (action == "accepted" && response_data["greeting"].isObject())
 			{
+				// The applicant receives the acceptor's greeting in real time.
+				// The acceptor receives both persisted messages in this HTTP
+				// response and caches them locally without duplicate WebSocket
+				// echoes.
 				ChatWSServer::notifyAutomaticFriendGreeting(
 					request["fromUserId"].asString(),
 					response_data["greeting"]);
