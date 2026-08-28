@@ -672,6 +672,75 @@ int ChatDao::updateMsgStatusByMsgId(uint64_t msgId, uint8_t msgStatus) const
     }
 }
 
+bool ChatDao::markPrivateMessageRead(
+    uint64_t msgId,
+    const std::string& sessionId,
+    const std::string& readerId,
+    const std::string& senderId) const
+{
+    if (msgId == 0 || sessionId.empty() || readerId.empty() ||
+        senderId.empty() || readerId == senderId)
+    {
+        return false;
+    }
+
+    auto con = Logger::GetInstance().createConnection();
+    if (!con) return false;
+    try
+    {
+        con->setAutoCommit(false);
+        std::unique_ptr<sql::PreparedStatement> messageStmt(
+            con->prepareStatement(
+                "UPDATE chatrecord SET msgStatus = ?, readTime = ? "
+                "WHERE msgId = ? AND sessionId = ? "
+                "AND receiveId = ? AND sendUserId = ?"));
+        messageStmt->setUInt(1, 3);
+        messageStmt->setUInt64(2, Logger::GetInstance().getcurrentTime());
+        messageStmt->setUInt64(3, msgId);
+        messageStmt->setString(4, sessionId);
+        messageStmt->setString(5, readerId);
+        messageStmt->setString(6, senderId);
+        if (messageStmt->executeUpdate() <= 0)
+        {
+            con->rollback();
+            con->setAutoCommit(true);
+            return false;
+        }
+
+        std::unique_ptr<sql::PreparedStatement> conversationStmt(
+            con->prepareStatement(
+                "UPDATE conversations SET "
+                "user1UnreadCount = IF(user1Id = ?, 0, user1UnreadCount), "
+                "user2UnreadCount = IF(user2Id = ?, 0, user2UnreadCount) "
+                "WHERE convId = ? AND ((user1Id = ? AND user2Id = ?) "
+                "OR (user1Id = ? AND user2Id = ?))"));
+        conversationStmt->setString(1, readerId);
+        conversationStmt->setString(2, readerId);
+        conversationStmt->setString(3, sessionId);
+        conversationStmt->setString(4, readerId);
+        conversationStmt->setString(5, senderId);
+        conversationStmt->setString(6, senderId);
+        conversationStmt->setString(7, readerId);
+        conversationStmt->executeUpdate();
+
+        con->commit();
+        con->setAutoCommit(true);
+        return true;
+    }
+    catch (const std::exception& error)
+    {
+        try
+        {
+            con->rollback();
+            con->setAutoCommit(true);
+        }
+        catch (...) {}
+        Logger::GetInstance().error(
+            std::string("Failed to mark private message read: ") + error.what());
+        return false;
+    }
+}
+
 int ChatDao::resetUnreadCountForUser(const std::string& convId, const std::string& userName) const
 {
     // 根据传入的 userName 是否匹配 user1Id / user2Id 来决定清零哪个未读计数

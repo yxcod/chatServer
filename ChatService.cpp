@@ -244,14 +244,20 @@ std::string ChatService::messageRead(const Json::Value& jsonMsg)
 	std::string sendId = jsonMsg["sender"].asString();
 	std::string sessionId = jsonMsg["sessionId"].asString();
 	ChatDao dao;
-	//更新聊天记录表中消息状态为已读
-    dao.updateMsgStatusByMsgId(typeId,3);
-	//更新会话表中未读消息数为0
-	dao.resetUnreadCountForUser(sessionId, sendId);
+    const std::string originalSenderId = jsonMsg["receiveId"].asString();
+    if (!dao.markPrivateMessageRead(
+            typeId, sessionId, sendId, originalSenderId))
+    {
+        Logger::GetInstance().warning(
+            "Rejected mismatched private read acknowledgement");
+        return "";
+    }
     //返回确认已读消息
     Json::Value forward;
-    forward["msgId"] = typeId;
-    forward["type"] = "read_ack";
+	forward["msgId"] = typeId;
+	forward["type"] = "read_ack";
+	forward["reader"] = sendId;
+	forward["sessionId"] = sessionId;
     Json::StreamWriterBuilder wbuilder;
     std::string forwardStr = Json::writeString(wbuilder, forward);
 	return forwardStr;

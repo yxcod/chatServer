@@ -50,6 +50,12 @@ public:
 
 	// 根据业务消息ID msgId 更新 chatrecord 表中的 msgStatus
 	int updateMsgStatusByMsgId(uint64_t msgId, uint8_t msgStatus) const;
+	// Marks a private message read only when all supplied conversation
+	// participants match the persisted record.
+	bool markPrivateMessageRead(uint64_t msgId,
+		const std::string& sessionId,
+		const std::string& readerId,
+		const std::string& senderId) const;
 
 	// 将指定会话 convId 中对应用户的未读数清零
 	// 如果 userName == user1Id，则将 user1UnreadCount 置为 0
