@@ -79,11 +79,12 @@ int FriendRelationDao::insertFriendApply(const FriendRelation& friendRelation) c
 {
     auto con = Logger::GetInstance().createConnection();
 
-    // Keep one application record for a directed user pair. A new attempt
-    // refreshes the message and create time so expiry starts again.
+    // Keep one application record for a user pair. Reusing the same row also
+    // prevents reciprocal requests from racing into duplicate relations.
     std::string selectSql =
         "SELECT id, status FROM friendrelation "
         "WHERE (fromUserId = ? AND toUserId = ?) "
+        "   OR (fromUserId = ? AND toUserId = ?) "
         "LIMIT 1";
 
     std::unique_ptr<sql::PreparedStatement> checkStmt;
@@ -94,6 +95,8 @@ int FriendRelationDao::insertFriendApply(const FriendRelation& friendRelation) c
         checkStmt.reset(con->prepareStatement(selectSql));
         checkStmt->setString(1, friendRelation.getFromUserId());
         checkStmt->setString(2, friendRelation.getToUserId());
+        checkStmt->setString(3, friendRelation.getToUserId());
+        checkStmt->setString(4, friendRelation.getFromUserId());
 
         res.reset(checkStmt->executeQuery());
         if (res->next())
@@ -109,21 +112,26 @@ int FriendRelationDao::insertFriendApply(const FriendRelation& friendRelation) c
             }
 
             std::string updateSql =
-                "UPDATE friendrelation SET status = ?, applyMsg = ?, "
-                "source = ?, createTime = ?, updateTime = ? WHERE id = ?";
+                "UPDATE friendrelation SET fromUserId = ?, toUserId = ?, "
+                "status = ?, applyMsg = ?, source = ?, createTime = ?, "
+                "updateTime = ? WHERE id = ?";
             std::unique_ptr<sql::PreparedStatement> updateStmt(
                 con->prepareStatement(updateSql));
-            updateStmt->setInt(1, 0); // 0 = 待验证
-            updateStmt->setString(2, friendRelation.getApplyMsg());
-            updateStmt->setString(3, friendRelation.getSource());
-            updateStmt->setUInt64(4, friendRelation.getCreateTime());
-            updateStmt->setUInt64(5, friendRelation.getUpdateTime());
-            updateStmt->setInt(6, relationId);
+            updateStmt->setString(1, friendRelation.getFromUserId());
+            updateStmt->setString(2, friendRelation.getToUserId());
+            updateStmt->setInt(3, 0); // 0 = 待验证
+            updateStmt->setString(4, friendRelation.getApplyMsg());
+            updateStmt->setString(5, friendRelation.getSource());
+            updateStmt->setUInt64(6, friendRelation.getCreateTime());
+            updateStmt->setUInt64(7, friendRelation.getUpdateTime());
+            updateStmt->setInt(8, relationId);
             return updateStmt->executeUpdate();
         }
     }
-    catch (...)
+    catch (const std::exception& error)
     {
+        Logger::GetInstance().error(
+            std::string("Failed to refresh friend application: ") + error.what());
         return 0;
     }
 
@@ -148,8 +156,10 @@ int FriendRelationDao::insertFriendApply(const FriendRelation& friendRelation) c
         pstmt->setUInt64(9, friendRelation.getUpdateTime());
         return pstmt->executeUpdate();
     }
-    catch (...)
+    catch (const std::exception& error)
     {
+        Logger::GetInstance().error(
+            std::string("Failed to insert friend application: ") + error.what());
         return 0;
     }
 }

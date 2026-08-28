@@ -34,6 +34,10 @@ Json::Value requestPayload(const FriendRelation& relation)
 	request["toUserId"] = relation.getToUserId();
 	request["fromNickName"] = fromUser.getNickName();
 	request["toNickName"] = toUser.getNickName();
+	request["fromAvatar"] = fromUser.getAvatar();
+	request["toAvatar"] = toUser.getAvatar();
+	request["fromAvatarVersion"] = Json::UInt64(fromUser.getModifyTime());
+	request["toAvatarVersion"] = Json::UInt64(toUser.getModifyTime());
 	request["applyMsg"] = relation.getApplyMsg();
 	request["createTime"] = Json::UInt64(relation.getCreateTime());
 	request["updateTime"] = Json::UInt64(relation.getUpdateTime());
@@ -152,6 +156,20 @@ Json::Value FriendRelationService::sendFriendApply(const Json::Value& jsonValue)
 		response_data["code"] = 103;
 		return response_data;
 	}
+	const FriendRelation existingRelation =
+		friendRelationDao.getFriendRelation(fromUserId, toUserId);
+	if (existingRelation.getId() > 0 &&
+		existingRelation.getStatus() == FriendRelation::RelationStatus::PENDING &&
+		existingRelation.getFromUserId() == toUserId &&
+		existingRelation.getToUserId() == fromUserId)
+	{
+		response_data["code"] = 104;
+		response_data["message"] =
+			u8"\u5BF9\u65B9\u5DF2\u5411\u4F60\u53D1\u9001\u597D\u53CB"
+			u8"\u7533\u8BF7\uFF0C\u8BF7\u5148\u5904\u7406\u8BE5\u7533\u8BF7";
+		response_data["request"] = requestPayload(existingRelation);
+		return response_data;
+	}
 	friendRelation.setFromUserId(fromUserId);
 	friendRelation.setToUserId(toUserId);
 	friendRelation.setApplyMsg(applyMsg);
@@ -193,6 +211,9 @@ Json::Value FriendRelationService::getPendingFriendApplyList(const Json::Value& 
 		UserInfo counterpartInfo = UserInfoDao().getUserinfo(counterpart);
 		jsonfriendObj["userName"] = counterpart;
 		jsonfriendObj["nickName"] = counterpartInfo.getNickName();
+		jsonfriendObj["avatar"] = counterpartInfo.getAvatar();
+		jsonfriendObj["avatarVersion"] =
+			Json::UInt64(counterpartInfo.getModifyTime());
 		jsonfriendObj["canRespond"] = incoming &&
 			friendInfo.getStatus() == FriendRelation::RelationStatus::PENDING;
 		FriendListArr.append(jsonfriendObj);
@@ -322,6 +343,9 @@ Json::Value FriendRelationService::getRecentAgreedFriendApply(const Json::Value&
 		jsonfriendObj["userName"] = counterpart;
 		jsonfriendObj["addTime"] = Json::UInt64(friendInfo.getUpdateTime());
 		jsonfriendObj["nickName"] = userInfo.getNickName();
+		jsonfriendObj["avatar"] = userInfo.getAvatar();
+		jsonfriendObj["avatarVersion"] =
+			Json::UInt64(userInfo.getModifyTime());
 		jsonfriendObj["remarks"] = userInfo.getNickName();
 		FriendListArr.append(jsonfriendObj);
 	}
