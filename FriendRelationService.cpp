@@ -232,7 +232,26 @@ Json::Value FriendRelationService::sendFriendApply(const Json::Value& jsonValue)
 			friendRelationDao.getDirectedFriendRelation(fromUserId, toUserId));
 		return response_data;
 	}
-	response_data["code"] = inserted == -2 ? 103 : 102;
+	if (inserted == -2)
+	{
+		response_data["code"] = 103;
+	}
+	else if (inserted == -3)
+	{
+		const FriendRelation reverseRequest =
+			friendRelationDao.getDirectedFriendRelation(toUserId, fromUserId);
+		response_data["code"] = 104;
+		response_data["message"] =
+			u8"\u5BF9\u65B9\u5DF2\u5411\u4F60\u53D1\u9001\u597D\u53CB"
+			u8"\u7533\u8BF7\uFF0C\u8BF7\u5148\u5904\u7406\u8BE5\u7533\u8BF7";
+		response_data["request"] = requestPayload(reverseRequest);
+	}
+	else
+	{
+		response_data["code"] = 102;
+		response_data["message"] =
+			"friend application could not be saved";
+	}
 	return response_data;
 }
 

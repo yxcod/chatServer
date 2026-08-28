@@ -12,7 +12,7 @@ public:
 	FriendRelationDao();
 	//获取该账号所有对应状态好友 state（0=待验证，1=已通过，2=已拒绝，3=已拉黑）
 	void getAllFriendWithUserId(const std::string& userId, const int& state,std::vector <UserInfo> &userInfoList)const;
-	//增加好友申请信息
+	// Insert or reuse an application. -2: accepted, -3: reverse pending.
 	int insertFriendApply(const FriendRelation& friendRelation) const;
 	//更新好友申请状态 传入唯一ID和状态值
 	int updateFriendApplyStatus(const int& relationId, const int& state) const;

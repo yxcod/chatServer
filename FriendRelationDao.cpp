@@ -78,88 +78,161 @@ void FriendRelationDao::getAllFriendWithUserId(const std::string& userId, const 
 int FriendRelationDao::insertFriendApply(const FriendRelation& friendRelation) const
 {
     auto con = Logger::GetInstance().createConnection();
+    if (!con)
+    {
+        Logger::GetInstance().error(
+            "Failed to save friend application: database connection is null");
+        return 0;
+    }
 
-    // Keep one application record for a user pair. Reusing the same row also
-    // prevents reciprocal requests from racing into duplicate relations.
-    std::string selectSql =
-        "SELECT id, status FROM friendrelation "
-        "WHERE (fromUserId = ? AND toUserId = ?) "
-        "   OR (fromUserId = ? AND toUserId = ?) "
-        "LIMIT 1";
-
-    std::unique_ptr<sql::PreparedStatement> checkStmt;
-    std::unique_ptr<sql::ResultSet> res;
-
+    // Lock every historical row for this unordered pair. Older databases can
+    // contain both A->B and B->A rows; selecting an arbitrary row and flipping
+    // its direction may violate a directional unique key when a deleted row is
+    // reused. Prefer the newest row that already has the requested direction.
     try
     {
-        checkStmt.reset(con->prepareStatement(selectSql));
+        con->setAutoCommit(false);
+        std::unique_ptr<sql::PreparedStatement> checkStmt(
+            con->prepareStatement(
+                "SELECT id, fromUserId, toUserId, status "
+                "FROM friendrelation "
+                "WHERE (fromUserId = ? AND toUserId = ?) "
+                "   OR (fromUserId = ? AND toUserId = ?) "
+                "ORDER BY updateTime DESC, id DESC FOR UPDATE"));
         checkStmt->setString(1, friendRelation.getFromUserId());
         checkStmt->setString(2, friendRelation.getToUserId());
         checkStmt->setString(3, friendRelation.getToUserId());
         checkStmt->setString(4, friendRelation.getFromUserId());
 
-        res.reset(checkStmt->executeQuery());
-        if (res->next())
+        uint64_t directedRelationId = 0;
+        uint64_t reverseRelationId = 0;
+        int newestPendingDirection = 0;
+        std::unique_ptr<sql::ResultSet> res(checkStmt->executeQuery());
+        while (res->next())
         {
-            const auto existingStatus = res->getUInt("status");
-            int relationId = res->getInt("id");
-            res.reset();
-
+            const unsigned int existingStatus = res->getUInt("status");
             if (existingStatus == static_cast<unsigned int>(
                     FriendRelation::RelationStatus::ACCEPTED))
             {
+                res.reset();
+                con->rollback();
+                con->setAutoCommit(true);
                 return -2;
             }
 
-            std::string updateSql =
+            const uint64_t relationId = res->getUInt64("id");
+            const std::string rowFromUserId = res->getString("fromUserId");
+            const std::string rowToUserId = res->getString("toUserId");
+            const bool sameDirection =
+                rowFromUserId == friendRelation.getFromUserId() &&
+                rowToUserId == friendRelation.getToUserId();
+            if (sameDirection && directedRelationId == 0)
+            {
+                directedRelationId = relationId;
+            }
+            else if (!sameDirection && reverseRelationId == 0)
+            {
+                reverseRelationId = relationId;
+            }
+            if (newestPendingDirection == 0 &&
+                existingStatus == static_cast<unsigned int>(
+                    FriendRelation::RelationStatus::PENDING))
+            {
+                newestPendingDirection = sameDirection ? 1 : -1;
+            }
+        }
+        res.reset();
+
+        if (newestPendingDirection < 0)
+        {
+            con->rollback();
+            con->setAutoCommit(true);
+            return -3;
+        }
+
+        const uint64_t reusableRelationId = directedRelationId != 0
+            ? directedRelationId : reverseRelationId;
+        int affectedRows = 0;
+        if (reusableRelationId != 0)
+        {
+            const std::string updateSql =
                 "UPDATE friendrelation SET fromUserId = ?, toUserId = ?, "
-                "status = ?, applyMsg = ?, source = ?, createTime = ?, "
-                "updateTime = ? WHERE id = ?";
+                "status = ?, fromRemark = ?, toRemark = ?, applyMsg = ?, "
+                "source = ?, createTime = ?, updateTime = ? WHERE id = ?";
             std::unique_ptr<sql::PreparedStatement> updateStmt(
                 con->prepareStatement(updateSql));
             updateStmt->setString(1, friendRelation.getFromUserId());
             updateStmt->setString(2, friendRelation.getToUserId());
             updateStmt->setInt(3, 0); // 0 = 待验证
-            updateStmt->setString(4, friendRelation.getApplyMsg());
-            updateStmt->setString(5, friendRelation.getSource());
-            updateStmt->setUInt64(6, friendRelation.getCreateTime());
-            updateStmt->setUInt64(7, friendRelation.getUpdateTime());
-            updateStmt->setInt(8, relationId);
-            return updateStmt->executeUpdate();
+            updateStmt->setString(4, friendRelation.getFromRemark());
+            updateStmt->setString(5, friendRelation.getToRemark());
+            updateStmt->setString(6, friendRelation.getApplyMsg());
+            updateStmt->setString(7, friendRelation.getSource());
+            updateStmt->setUInt64(8, friendRelation.getCreateTime());
+            updateStmt->setUInt64(9, friendRelation.getUpdateTime());
+            updateStmt->setUInt64(10, reusableRelationId);
+            affectedRows = updateStmt->executeUpdate();
         }
+        else
+        {
+            const std::string insertSql =
+                "INSERT INTO friendrelation "
+                "(fromUserId, toUserId, status, fromRemark, toRemark, source, "
+                "applyMsg, createTime, updateTime) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            std::unique_ptr<sql::PreparedStatement> insertStmt(
+                con->prepareStatement(insertSql));
+            insertStmt->setString(1, friendRelation.getFromUserId());
+            insertStmt->setString(2, friendRelation.getToUserId());
+            insertStmt->setInt(3, static_cast<int>(
+                FriendRelation::RelationStatus::PENDING));
+            insertStmt->setString(4, friendRelation.getFromRemark());
+            insertStmt->setString(5, friendRelation.getToRemark());
+            insertStmt->setString(6, friendRelation.getSource());
+            insertStmt->setString(7, friendRelation.getApplyMsg());
+            insertStmt->setUInt64(8, friendRelation.getCreateTime());
+            insertStmt->setUInt64(9, friendRelation.getUpdateTime());
+            affectedRows = insertStmt->executeUpdate();
+        }
+
+        if (affectedRows <= 0)
+        {
+            con->rollback();
+            con->setAutoCommit(true);
+            return 0;
+        }
+        con->commit();
+        con->setAutoCommit(true);
+        return affectedRows;
     }
     catch (const std::exception& error)
     {
+        try
+        {
+            con->rollback();
+            con->setAutoCommit(true);
+        }
+        catch (...)
+        {
+        }
         Logger::GetInstance().error(
-            std::string("Failed to refresh friend application: ") + error.what());
+            std::string("Failed to save friend application for pair ") +
+            friendRelation.getFromUserId() + " -> " +
+            friendRelation.getToUserId() + ": " + error.what());
         return 0;
     }
-
-    // 不存在记录：执行插入
-    std::string insertSql =
-        "INSERT INTO friendrelation "
-        "(fromUserId, toUserId, status, fromRemark, toRemark, source, applyMsg, createTime, updateTime) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-
-    try
+    catch (...)
     {
-        std::unique_ptr<sql::PreparedStatement> pstmt(
-            con->prepareStatement(insertSql));
-        pstmt->setString(1, friendRelation.getFromUserId());
-        pstmt->setString(2, friendRelation.getToUserId());
-        pstmt->setInt(3, 0);
-        pstmt->setString(4, friendRelation.getFromRemark());
-        pstmt->setString(5, friendRelation.getToRemark());
-        pstmt->setString(6, friendRelation.getSource());
-        pstmt->setString(7, friendRelation.getApplyMsg());
-        pstmt->setUInt64(8, friendRelation.getCreateTime());
-        pstmt->setUInt64(9, friendRelation.getUpdateTime());
-        return pstmt->executeUpdate();
-    }
-    catch (const std::exception& error)
-    {
+        try
+        {
+            con->rollback();
+            con->setAutoCommit(true);
+        }
+        catch (...)
+        {
+        }
         Logger::GetInstance().error(
-            std::string("Failed to insert friend application: ") + error.what());
+            "Failed to save friend application: unknown database error");
         return 0;
     }
 }
@@ -343,7 +416,7 @@ FriendRelation FriendRelationDao::getDirectedFriendRelation(
         auto con = Logger::GetInstance().createConnection();
         std::unique_ptr<sql::PreparedStatement> pstmt(con->prepareStatement(
             "SELECT * FROM friendrelation WHERE fromUserId = ? AND toUserId = ? "
-            "ORDER BY id DESC LIMIT 1"));
+            "ORDER BY updateTime DESC, id DESC LIMIT 1"));
         pstmt->setString(1, fromUserId);
         pstmt->setString(2, toUserId);
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
@@ -375,7 +448,7 @@ FriendRelation FriendRelationDao::getFriendRelation(const std::string& userId1, 
         "SELECT * FROM friendrelation "
         "WHERE (fromUserId = ? AND toUserId = ?) "
         "   OR (fromUserId = ? AND toUserId = ?) "
-        "LIMIT 1";
+        "ORDER BY updateTime DESC, id DESC LIMIT 1";
 
     auto con = Logger::GetInstance().createConnection();
 
