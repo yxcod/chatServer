@@ -17,6 +17,7 @@ public:
     std::uint64_t getUpdatedAt() const noexcept { return updatedAt_; }
     std::uint64_t getDeletedAt() const noexcept { return deletedAt_; }
     const std::string& getDisplayName() const noexcept { return displayName_; }
+    const std::string& getAvatarName() const noexcept { return avatarName_; }
 
     void setCommentId(std::uint64_t value) noexcept { commentId_ = value; }
     void setEntryId(std::uint64_t value) noexcept { entryId_ = value; }
@@ -28,6 +29,7 @@ public:
     void setUpdatedAt(std::uint64_t value) noexcept { updatedAt_ = value; }
     void setDeletedAt(std::uint64_t value) noexcept { deletedAt_ = value; }
     void setDisplayName(std::string value) { displayName_ = std::move(value); }
+    void setAvatarName(std::string value) { avatarName_ = std::move(value); }
 
 private:
     std::uint64_t commentId_{0};
@@ -40,4 +42,5 @@ private:
     std::uint64_t updatedAt_{0};
     std::uint64_t deletedAt_{0};
     std::string displayName_;
+    std::string avatarName_;
 };

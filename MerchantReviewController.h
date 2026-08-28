@@ -22,6 +22,8 @@ public:
                       "/api/merchantReview/reaction", drogon::Post);
         ADD_METHOD_TO(MerchantReviewController::addComment,
                       "/api/merchantReview/comment", drogon::Post);
+        ADD_METHOD_TO(MerchantReviewController::removeComment,
+                      "/api/merchantReview/comment/remove", drogon::Post);
         ADD_METHOD_TO(MerchantReviewController::removeEntry,
                       "/api/merchantReview/remove", drogon::Post);
     METHOD_LIST_END
@@ -54,6 +56,14 @@ public:
                      std::function<void(const drogon::HttpResponsePtr&)>&& callback)
     {
         handle(request, std::move(callback), &MerchantReviewService::removeEntry);
+    }
+
+    void removeComment(
+        const drogon::HttpRequestPtr& request,
+        std::function<void(const drogon::HttpResponsePtr&)>&& callback)
+    {
+        handle(request, std::move(callback),
+               &MerchantReviewService::removeComment);
     }
 
 private:

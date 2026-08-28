@@ -25,6 +25,10 @@ public:
                                         const std::string& content,
                                         const std::string& imageName,
                                         std::uint64_t now) const;
+    MerchantReviewEntryModel removeComment(std::uint64_t entryId,
+                                           std::uint64_t commentId,
+                                           const std::string& userName,
+                                           std::uint64_t now) const;
     void removeEntry(std::uint64_t entryId,
                      const std::string& ownerUserName) const;
 

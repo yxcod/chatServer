@@ -293,6 +293,53 @@ MerchantReviewEntryModel MerchantReviewDao::addComment(
     }
 }
 
+MerchantReviewEntryModel MerchantReviewDao::removeComment(
+    std::uint64_t entryId,
+    std::uint64_t commentId,
+    const std::string& userName,
+    std::uint64_t now) const
+{
+    auto pooled = DatabaseConnectionPool::instance().acquire();
+    sql::Connection* connection = pooled.operator->();
+    connection->setAutoCommit(false);
+    try
+    {
+        lockEntry(connection, entryId);
+        std::unique_ptr<sql::PreparedStatement> removeStatement(
+            connection->prepareStatement(
+                "UPDATE merchantReviewComment SET status = 1, updatedAt = ?, "
+                "deletedAt = ? WHERE commentId = ? AND entryId = ? "
+                "AND userName = ? AND status = 0"));
+        removeStatement->setUInt64(1, now);
+        removeStatement->setUInt64(2, now);
+        removeStatement->setUInt64(3, commentId);
+        removeStatement->setUInt64(4, entryId);
+        removeStatement->setString(5, userName);
+        if (removeStatement->executeUpdate() == 0)
+            throw std::runtime_error("Comment not found or not owned");
+
+        std::unique_ptr<sql::PreparedStatement> countStatement(
+            connection->prepareStatement(
+                "UPDATE merchantReviewEntry SET "
+                "commentCount = (SELECT COUNT(*) FROM merchantReviewComment "
+                "WHERE entryId = ? AND status = 0), updatedAt = ? "
+                "WHERE entryId = ?"));
+        countStatement->setUInt64(1, entryId);
+        countStatement->setUInt64(2, now);
+        countStatement->setUInt64(3, entryId);
+        countStatement->executeUpdate();
+
+        connection->commit();
+        connection->setAutoCommit(true);
+        return getEntry(connection, entryId, userName);
+    }
+    catch (...)
+    {
+        rollbackQuietly(connection);
+        throw;
+    }
+}
+
 void MerchantReviewDao::removeEntry(
     std::uint64_t entryId,
     const std::string& ownerUserName) const
@@ -338,7 +385,8 @@ std::vector<MerchantReviewCommentModel> MerchantReviewDao::getComments(
         connection->prepareStatement(
             "SELECT c.commentId, c.entryId, c.userName, c.content, c.imageName, c.status, "
             "c.createdAt, c.updatedAt, c.deletedAt, "
-            "COALESCE(NULLIF(u.nickName, ''), c.userName) AS displayName "
+            "COALESCE(NULLIF(u.nickName, ''), c.userName) AS displayName, "
+            "COALESCE(u.avatar, '') AS avatarName "
             "FROM merchantReviewComment c LEFT JOIN userinfo u "
             "ON BINARY u.userName = BINARY c.userName "
             "WHERE c.entryId = ? AND c.status = 0 "
@@ -360,6 +408,7 @@ std::vector<MerchantReviewCommentModel> MerchantReviewDao::getComments(
         if (!result->isNull("deletedAt"))
             comment.setDeletedAt(result->getUInt64("deletedAt"));
         comment.setDisplayName(result->getString("displayName").asStdString());
+        comment.setAvatarName(result->getString("avatarName").asStdString());
         comments.push_back(std::move(comment));
     }
     return comments;

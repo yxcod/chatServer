@@ -111,6 +111,7 @@ Json::Value commentToJson(const MerchantReviewCommentModel& comment)
     value["id"] = Json::UInt64(comment.getCommentId());
     value["userId"] = comment.getUserName();
     value["displayName"] = comment.getDisplayName();
+    value["avatarName"] = comment.getAvatarName();
     value["content"] = comment.getContent();
     value["imageName"] = comment.getImageName();
     value["createdAt"] = Json::UInt64(comment.getCreatedAt());
@@ -336,5 +337,26 @@ Json::Value MerchantReviewService::removeEntry(
     {
         std::cerr << "Remove merchant review failed: " << error.what() << '\n';
         return response(102, "Failed to remove merchant review");
+    }
+}
+
+Json::Value MerchantReviewService::removeComment(
+    const std::string& userName,
+    const Json::Value& request) const
+{
+    try
+    {
+        const auto entryId = readUInt64(request["entryId"]);
+        const auto commentId = readUInt64(request["commentId"]);
+        if (entryId == 0 || commentId == 0)
+            return response(101, "Invalid comment id");
+        return successWithData(entryToJson(MerchantReviewDao().removeComment(
+            entryId, commentId, userName, currentTimeMillis())));
+    }
+    catch (const std::exception& error)
+    {
+        std::cerr << "Remove merchant review comment failed: "
+                  << error.what() << '\n';
+        return response(102, "Failed to remove merchant review comment");
     }
 }
