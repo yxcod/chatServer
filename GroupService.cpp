@@ -2,7 +2,9 @@
 #include"Logger.h"
 #include "UserInfoDao.h"
 #include <algorithm>
+#include <sstream>
 #include <unordered_map>
+#include <unordered_set>
 Json::Value GroupService::getAllGroups(const Json::Value& groupInfo)
 {
 	// 获取用户所有群组信息
@@ -324,6 +326,7 @@ Json::Value GroupService::addGroupMember(const Json::Value& memberInfo)
 	GroupChatDao groupChatDao;
 	GroupMemberDao groupMemberDao;
 	UserInfoDao userInfoDao;
+	const std::string operatorId = memberInfo.get("operatorId", "").asString();
 
 	// 2. 检查群是否存在
 	if (!groupChatDao.groupExists(groupId64))
@@ -332,9 +335,20 @@ Json::Value GroupService::addGroupMember(const Json::Value& memberInfo)
 		response["msg"] = "group not exists";
 		return response;
 	}
+	if (operatorId.empty() ||
+		!groupMemberDao.isUserInGroup(groupId64, operatorId))
+	{
+		response["code"] = 403;
+		response["msg"] = "operator is not an active group member";
+		return response;
+	}
+	const UserInfo operatorInfo = userInfoDao.getUserinfo(operatorId);
+	const std::string operatorNickname = operatorInfo.getNickName().empty()
+		? operatorId : operatorInfo.getNickName();
 
 	// 3. 逐个处理用户
 	Json::Value resultArray(Json::arrayValue);
+	Json::Value systemMessages(Json::arrayValue);
 	bool anySuccess = false;
 
 	for (const auto& userNode : users)
@@ -385,6 +399,42 @@ Json::Value GroupService::addGroupMember(const Json::Value& memberInfo)
 			anySuccess = true;
 			itemResult["code"] = 100;
 			itemResult["groupNickName"] = member.getGroupNickName();
+
+			const std::string joinedNickname = member.getGroupNickName().empty()
+				? userId : member.getGroupNickName();
+			Json::Value metadata;
+			metadata["kind"] = "group_member_joined";
+			metadata["userId"] = userId;
+			metadata["nickname"] = joinedNickname;
+			metadata["inviterId"] = operatorId;
+			metadata["inviterNickname"] = operatorNickname;
+			Json::StreamWriterBuilder writer;
+			writer["indentation"] = "";
+
+			Json::Value systemRequest;
+			systemRequest["type"] = "groupChat";
+			systemRequest["msgId"] = Json::UInt64(
+				Logger::GetInstance().getcurrentTime());
+			systemRequest["sendUserId"] = userId;
+			systemRequest["receiveId"] = Json::UInt64(groupId64);
+			systemRequest["receiveType"] = 2;
+			systemRequest["msgType"] = 6;
+			systemRequest["msgContent"] = operatorId == userId
+				? joinedNickname + u8"\u52A0\u5165\u4E86\u7FA4\u804A"
+				: operatorNickname + u8"\u9080\u8BF7" + joinedNickname +
+					u8"\u52A0\u5165\u4E86\u7FA4\u804A";
+			systemRequest["extendInfo"] =
+				Json::writeString(writer, metadata);
+			const Json::Value systemResult = handleGroupMessage(systemRequest);
+			if (systemResult["code"].asInt() == 100)
+			{
+				systemMessages.append(systemResult);
+			}
+			else
+			{
+				Logger::GetInstance().warning(
+					"Failed to persist group member join event");
+			}
 		}
 		else
 		{
@@ -399,6 +449,7 @@ Json::Value GroupService::addGroupMember(const Json::Value& memberInfo)
 	response["groupId"] = Json::UInt64(groupId64);
 	//返回成功添加到群内的用户列表
 	response["results"] = resultArray;
+	response["systemMessages"] = systemMessages;
 	return response;
 }
 
@@ -744,6 +795,42 @@ Json::Value GroupService::handleGroupMessage(const Json::Value& jsonMsg)
 		response["error"] = "sender is not an active group member";
 		return response;
 	}
+	if (msgType < 1 || msgType > 6)
+	{
+		response["error"] = "unsupported group message type";
+		return response;
+	}
+
+	std::string normalizedExtendInfo = jsonMsg.get("extendInfo", "{}").asString();
+	if (msgType != 6)
+	{
+		Json::Value metadata;
+		Json::CharReaderBuilder reader;
+		std::string errors;
+		std::istringstream stream(normalizedExtendInfo);
+		if (Json::parseFromStream(reader, stream, &metadata, &errors) &&
+			metadata.isObject() && metadata["mentions"].isArray())
+		{
+			const std::unordered_set<std::string> activeUsers(
+				userIds.begin(), userIds.end());
+			std::unordered_set<std::string> seenUsers;
+			Json::Value validMentions(Json::arrayValue);
+			for (const auto& mention : metadata["mentions"])
+			{
+				const std::string mentionedUser = mention["userId"].asString();
+				if (activeUsers.find(mentionedUser) == activeUsers.end() ||
+					!seenUsers.insert(mentionedUser).second)
+				{
+					continue;
+				}
+				validMentions.append(mention);
+			}
+			metadata["mentions"] = validMentions;
+			Json::StreamWriterBuilder writer;
+			writer["indentation"] = "";
+			normalizedExtendInfo = Json::writeString(writer, metadata);
+		}
+	}
 
 	GroupMessageDao groupMessageDao;
 	GroupMessageModel msg;
@@ -752,7 +839,7 @@ Json::Value GroupService::handleGroupMessage(const Json::Value& jsonMsg)
 	msg.setIsDeleted(0);
 	msg.setIsRead(0);
 	msg.setMsgContent(content);
-	msg.setExtendInfo(jsonMsg.get("extendInfo", "{}").asString());
+	msg.setExtendInfo(normalizedExtendInfo);
 	msg.setMsgType(static_cast<uint8_t>(msgType));
 	msg.setSenderId(sender);
 	const uint64_t serverTime = Logger::GetInstance().getcurrentTime();
@@ -788,6 +875,7 @@ Json::Value GroupService::handleGroupMessage(const Json::Value& jsonMsg)
 		response["code"] = 100;
 		response["msgId"] = Json::UInt64(msg.getMsgId());
 		response["sendTime"] = Json::UInt64(serverTime);
+		response["extendInfo"] = normalizedExtendInfo;
 	}
 	return response;
 	

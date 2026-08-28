@@ -48,6 +48,10 @@ public:
         uint8_t role,
         const std::string& operatorId);
 
+    static void notifyGroupSystemMessages(
+        const std::vector<std::string>& memberIds,
+        const Json::Value& messages);
+
     static void notifyFriendRequestUpdated(
         const std::vector<std::string>& userIds,
         const Json::Value& request,

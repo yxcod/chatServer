@@ -375,6 +375,30 @@ void ChatWSServer::notifyGroupMemberRoleUpdated(
     for (const auto& recipient : recipients) recipient->send(payload);
 }
 
+void ChatWSServer::notifyGroupSystemMessages(
+    const std::vector<std::string>& memberIds,
+    const Json::Value& messages)
+{
+    if (!messages.isArray() || messages.empty()) return;
+    for (const auto& message : messages)
+    {
+        const std::string payload = jsonString(message);
+        std::vector<WebSocketConnectionPtr> recipients;
+        {
+            std::lock_guard<std::mutex> lock(connMutex);
+            for (const auto& memberId : memberIds)
+            {
+                const auto it = onlineUsers.find(memberId);
+                if (it != onlineUsers.end() && it->second && it->second->connected())
+                {
+                    recipients.push_back(it->second);
+                }
+            }
+        }
+        for (const auto& recipient : recipients) recipient->send(payload);
+    }
+}
+
 void ChatWSServer::notifyFriendRequestUpdated(
     const std::vector<std::string>& userIds,
     const Json::Value& request,
@@ -609,6 +633,16 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
     {
 		try
 		{
+			if (jsonMsg["msgType"].asInt() == 6)
+			{
+				Json::Value failure = jsonMsg;
+				failure["type"] = "groupChatCallback";
+				failure["code"] = 101;
+				failure["clientMsgId"] = jsonMsg["msgId"];
+				failure["error"] = "system group messages are server-only";
+				conn->send(jsonString(failure));
+				return;
+			}
 			GroupService groupService;
 			std::string sender = jsonMsg["sendUserId"].asString();
 		if (connectedUserName(conn) != sender)
