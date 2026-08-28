@@ -465,6 +465,12 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
         if (jsonMsg.get("privacyMode", false).asBool())
         {
             const std::string receiveId = jsonMsg["receiveId"].asString();
+            if (!FriendRelationDao().hasAcceptedRelation(
+                    authenticatedUser, receiveId))
+            {
+                conn->send(chatService.messageFailed(jsonMsg, "not_friends"));
+                return;
+            }
             if (receiveId.empty() || !isOnline(receiveId))
             {
                 conn->send(chatService.messageFailed(

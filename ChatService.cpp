@@ -137,6 +137,15 @@ Json::Value ChatService::insertChatRecord(const Json::Value& chatRecord)
         result["error"] = "invalid private message";
         return result;
     }
+    // Private messages are only valid while an accepted friendship exists.
+    // Enforce this before touching the conversation or chat-record tables so
+    // a stale client cannot recreate a deleted relationship by sending data.
+    if (!FriendRelationDao().hasAcceptedRelation(
+            rec.getSendUserId(), rec.getReceiveId()))
+    {
+        result["error"] = "not_friends";
+        return result;
+    }
     if (rec.getSendTime() == 0)
     {
         rec.setSendTime(Logger::GetInstance().getcurrentTime());
@@ -273,6 +282,11 @@ std::string ChatService::messageFailed(
     response["msgId"] = jsonMsg["msgId"];
     response["status"] = "failed";
     response["reason"] = reason;
+    if (reason == "not_friends")
+    {
+        response["code"] = 403;
+        response["errorCode"] = "not_friends";
+    }
     Json::StreamWriterBuilder builder;
     return Json::writeString(builder, response);
 }
