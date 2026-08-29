@@ -88,7 +88,9 @@ std::vector<GroupMemberModel> GroupMemberDao::getMembersByGroup(uint64_t groupId
     }
     catch (const std::exception& e)
     {
-       // Logger::GetInstance().error(e.what > ());
+        Logger::GetInstance().error(
+            std::string("getMembersByGroup failed: ") + e.what());
+        throw;
     }
     return members;
 }
@@ -128,7 +130,9 @@ std::vector<GroupMemberModel> GroupMemberDao::getGroupsByUser(const std::string&
     }
     catch (const std::exception& e)
     {
-        //Logger::GetInstance().error(e.what > ());
+        Logger::GetInstance().error(
+            std::string("getGroupsByUser failed: ") + e.what());
+        throw;
     }
     return result;
 }

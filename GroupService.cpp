@@ -12,9 +12,10 @@ Json::Value GroupService::getAllGroups(const Json::Value& groupInfo)
 	GroupChatDao groupDao;
 	std::string userId = groupInfo["userName"].asString();
 	auto groups = groupDao.getGroupsByUserId(userId);
-	response["code"] = 101;
+	response["code"] = 100;
 	if (groups.size() == 0)
 	{
+		response["groups"] = Json::Value(Json::arrayValue);
 		return response;
 	}
 	Json::Value groupArray(Json::arrayValue);
