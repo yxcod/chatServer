@@ -241,7 +241,35 @@ Json::Value GroupService::getGroupConversations(const Json::Value& userInfo)
 		{
 			msgJson["lastMsg"] ="[文件]";
 		}
-		msgJson["unreadCount"] = msgDao.getUnreadCountByUserAndGroup(userId, convs.getGroupId());
+		const int unreadCount = msgDao.getUnreadCountByUserAndGroup(
+			userId, convs.getGroupId());
+		msgJson["unreadCount"] = unreadCount;
+		msgJson["mentionedMe"] = false;
+		if (unreadCount > 0)
+		{
+			const auto latestMessages = msgDao.getRecentMessages(
+				convs.getGroupId(), 1);
+			if (!latestMessages.empty())
+			{
+				Json::Value extension;
+				Json::CharReaderBuilder builder;
+				std::string errors;
+				const auto& raw = latestMessages.back().getExtendInfo();
+				std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+				if (reader->parse(raw.data(), raw.data() + raw.size(),
+					&extension, &errors) && extension["mentions"].isArray())
+				{
+					for (const auto& mention : extension["mentions"])
+					{
+						if (mention.get("userId", "").asString() == userId)
+						{
+							msgJson["mentionedMe"] = true;
+							break;
+						}
+					}
+				}
+			}
+		}
 		msgArray.append(msgJson);
 	}
 	response["conversations"] = msgArray;

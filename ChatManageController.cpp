@@ -2,6 +2,9 @@
 #include "FriendRelationDao.h"
 #include "HeartbeatManager.h"
 #include "JPushService.h"
+#include "GroupChatDao.h"
+#include "GroupMemberDao.h"
+#include "UserInfoDao.h"
 #include <algorithm>
 #include <filesystem>
 #include <unordered_set>
@@ -25,6 +28,41 @@ std::string notificationBody(const Json::Value& message)
     if (type == 4) return "[视频]";
     if (type == 5) return "[文件]";
     return "你收到了一条新消息";
+}
+
+std::string displayNameForUser(const std::string& userId)
+{
+    const auto user = UserInfoDao().getUserinfo(userId);
+    return user.getNickName().empty() ? userId : user.getNickName();
+}
+
+std::string displayNameInGroup(uint64_t groupId, const std::string& userId)
+{
+    const auto members = GroupMemberDao().getMembersByGroup(groupId);
+    const auto it = std::find_if(members.begin(), members.end(),
+        [&userId](const GroupMemberModel& member) {
+            return member.getUserId() == userId;
+        });
+    if (it != members.end() && !it->getGroupNickName().empty())
+        return it->getGroupNickName();
+    return displayNameForUser(userId);
+}
+
+std::string truncateUtf8(const std::string& value, std::size_t maxCharacters)
+{
+    std::size_t offset = 0;
+    std::size_t characters = 0;
+    while (offset < value.size() && characters < maxCharacters)
+    {
+        const auto lead = static_cast<unsigned char>(value[offset]);
+        const std::size_t width = lead < 0x80 ? 1 :
+            (lead & 0xE0) == 0xC0 ? 2 :
+            (lead & 0xF0) == 0xE0 ? 3 :
+            (lead & 0xF8) == 0xF0 ? 4 : 1;
+        offset = (std::min)(value.size(), offset + width);
+        ++characters;
+    }
+    return offset < value.size() ? value.substr(0, offset) + u8"…" : value;
 }
 
 struct PrivacyMessageState
@@ -562,6 +600,7 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
         }
 		jsonMsg["sessionId"] = dbResult["sessionId"];
 		jsonMsg["sendTime"] = dbResult["sendTime"];
+		jsonMsg["senderName"] = displayNameForUser(authenticatedUser);
 
         std::string receiveId = jsonMsg["receiveId"].asString();
         {
@@ -579,8 +618,12 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
         pushExtras["senderId"] = authenticatedUser;
         pushExtras["sessionId"] = jsonMsg["sessionId"];
         pushExtras["msgId"] = jsonMsg["msgId"];
+        const std::string senderName = displayNameForUser(authenticatedUser);
+        const std::string preview = truncateUtf8(notificationBody(jsonMsg), 48);
+        pushExtras["senderName"] = senderName;
+        pushExtras["preview"] = preview;
         JPushService::pushToUsers(
-            {receiveId}, "新消息", notificationBody(jsonMsg), pushExtras);
+            {receiveId}, senderName, preview, pushExtras);
     }
     // 消息已读回执
     else if (msgType == "chatCallback")
@@ -752,6 +795,14 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
 			conn->send(jsonString(result));
 			return;
 		}
+		const auto group = GroupChatDao().getGroupById(
+			static_cast<uint64_t>(groupId));
+		const std::string groupName = group.getGroupName().empty()
+			? std::string("群聊") : group.getGroupName();
+		const std::string senderName = displayNameInGroup(
+			static_cast<uint64_t>(groupId), sender);
+		result["groupName"] = groupName;
+		result["senderName"] = senderName;
 		std::string forwardStr = jsonString(result);
         std::lock_guard<std::mutex> lock(connMutex);
         for (const auto& member : userIds)
@@ -777,11 +828,15 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
         pushExtras["groupId"] = groupId;
         pushExtras["senderId"] = sender;
         pushExtras["msgId"] = result["msgId"];
+        const std::string preview = truncateUtf8(notificationBody(result), 42);
+        pushExtras["groupName"] = groupName;
+        pushExtras["senderName"] = senderName;
+        pushExtras["preview"] = preview;
         std::vector<std::string> pushRecipients;
         for (const auto& member : userIds)
             if (member != sender) pushRecipients.push_back(member);
         JPushService::pushToUsers(
-            pushRecipients, "群聊消息", notificationBody(result), pushExtras);
+            pushRecipients, groupName, senderName + u8"：" + preview, pushExtras);
 		}
 		catch (const std::exception& e)
 		{
