@@ -154,6 +154,7 @@ Json::Value entryToJson(const MerchantReviewEntryModel& entry)
     Json::Value value(Json::objectValue);
     value["entryId"] = Json::UInt64(entry.getEntryId());
     value["ownerUserName"] = entry.getOwnerUserName();
+    value["uploadedImages"] = parseImageUrls(entry.getUploadedImagesJson());
     value["merchant"] = std::move(merchant);
     value["addedAt"] = Json::UInt64(entry.getCreatedAt());
     value["likes"] = entry.getLikeCount();
@@ -337,6 +338,38 @@ Json::Value MerchantReviewService::removeEntry(
     {
         std::cerr << "Remove merchant review failed: " << error.what() << '\n';
         return response(102, "Failed to remove merchant review");
+    }
+}
+
+Json::Value MerchantReviewService::setUploadedImages(
+    const std::string& userName,
+    const Json::Value& request) const
+{
+    try
+    {
+        const auto entryId = readUInt64(request["entryId"]);
+        const Json::Value imageNames = request["imageNames"];
+        if (entryId == 0 || !imageNames.isArray() || imageNames.size() > 4)
+            return response(101, "Invalid merchant images");
+        Json::Value images(Json::arrayValue);
+        for (const auto& item : imageNames)
+        {
+            if (!item.isString()) return response(101, "Invalid merchant image");
+            const std::string imageName = trim(item.asString());
+            if (imageName.empty() || !safeImageName(imageName))
+                return response(101, "Invalid merchant image");
+            Json::Value image(Json::objectValue);
+            image["ownerId"] = userName;
+            image["imageName"] = imageName;
+            images.append(std::move(image));
+        }
+        return successWithData(entryToJson(MerchantReviewDao().setUploadedImages(
+            entryId, userName, jsonArrayToString(images), currentTimeMillis())));
+    }
+    catch (const std::exception& error)
+    {
+        std::cerr << "Set merchant review images failed: " << error.what() << '\n';
+        return response(102, "Failed to update merchant images");
     }
 }
 

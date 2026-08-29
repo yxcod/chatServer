@@ -22,6 +22,7 @@ public:
     bool hasRating() const noexcept { return hasRating_; }
     const std::string& getImageUrl() const noexcept { return imageUrl_; }
     const std::string& getImageUrlsJson() const noexcept { return imageUrlsJson_; }
+    const std::string& getUploadedImagesJson() const noexcept { return uploadedImagesJson_; }
     const std::string& getPhone() const noexcept { return phone_; }
     const std::string& getOpeningHours() const noexcept { return openingHours_; }
     double getPrice() const noexcept { return price_; }
@@ -53,6 +54,7 @@ public:
     void clearRating() noexcept { rating_ = 0; hasRating_ = false; }
     void setImageUrl(std::string value) { imageUrl_ = std::move(value); }
     void setImageUrlsJson(std::string value) { imageUrlsJson_ = std::move(value); }
+    void setUploadedImagesJson(std::string value) { uploadedImagesJson_ = std::move(value); }
     void setPhone(std::string value) { phone_ = std::move(value); }
     void setOpeningHours(std::string value) { openingHours_ = std::move(value); }
     void setPrice(double value) noexcept { price_ = value; hasPrice_ = true; }
@@ -85,6 +87,7 @@ private:
     bool hasRating_{false};
     std::string imageUrl_;
     std::string imageUrlsJson_;
+    std::string uploadedImagesJson_;
     std::string phone_;
     std::string openingHours_;
     double price_{0};

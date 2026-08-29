@@ -26,6 +26,8 @@ public:
                       "/api/merchantReview/comment/remove", drogon::Post);
         ADD_METHOD_TO(MerchantReviewController::removeEntry,
                       "/api/merchantReview/remove", drogon::Post);
+        ADD_METHOD_TO(MerchantReviewController::setUploadedImages,
+                      "/api/merchantReview/images", drogon::Post);
     METHOD_LIST_END
 
     void addEntry(const drogon::HttpRequestPtr& request,
@@ -64,6 +66,14 @@ public:
     {
         handle(request, std::move(callback),
                &MerchantReviewService::removeComment);
+    }
+
+    void setUploadedImages(
+        const drogon::HttpRequestPtr& request,
+        std::function<void(const drogon::HttpResponsePtr&)>&& callback)
+    {
+        handle(request, std::move(callback),
+               &MerchantReviewService::setUploadedImages);
     }
 
 private:

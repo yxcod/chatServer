@@ -17,6 +17,8 @@ public:
                            const Json::Value& request) const;
     Json::Value removeComment(const std::string& userName,
                               const Json::Value& request) const;
+    Json::Value setUploadedImages(const std::string& userName,
+                                  const Json::Value& request) const;
     Json::Value removeEntry(const std::string& userName,
                             const Json::Value& request) const;
 };

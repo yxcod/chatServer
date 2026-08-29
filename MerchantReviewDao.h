@@ -29,6 +29,11 @@ public:
                                            std::uint64_t commentId,
                                            const std::string& userName,
                                            std::uint64_t now) const;
+    MerchantReviewEntryModel setUploadedImages(
+        std::uint64_t entryId,
+        const std::string& ownerUserName,
+        const std::string& uploadedImagesJson,
+        std::uint64_t now) const;
     void removeEntry(std::uint64_t entryId,
                      const std::string& ownerUserName) const;
 

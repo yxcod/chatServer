@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS `merchantReviewEntry` (
   `rating` DECIMAL(4,2) NULL,
   `imageUrl` VARCHAR(2048) NOT NULL DEFAULT '',
   `imageUrlsJson` LONGTEXT NULL,
+  `uploadedImagesJson` LONGTEXT NULL,
   `phone` VARCHAR(100) NOT NULL DEFAULT '',
   `openingHours` VARCHAR(500) NOT NULL DEFAULT '',
   `price` DECIMAL(10,2) NULL,

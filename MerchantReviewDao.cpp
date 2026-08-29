@@ -52,6 +52,9 @@ MerchantReviewEntryModel readEntry(sql::ResultSet& result)
     entry.setImageUrl(result.getString("imageUrl").asStdString());
     if (!result.isNull("imageUrlsJson"))
         entry.setImageUrlsJson(result.getString("imageUrlsJson").asStdString());
+    if (!result.isNull("uploadedImagesJson"))
+        entry.setUploadedImagesJson(
+            result.getString("uploadedImagesJson").asStdString());
     entry.setPhone(result.getString("phone").asStdString());
     entry.setOpeningHours(result.getString("openingHours").asStdString());
     if (!result.isNull("price")) entry.setPrice(result.getDouble("price"));
@@ -338,6 +341,27 @@ MerchantReviewEntryModel MerchantReviewDao::removeComment(
         rollbackQuietly(connection);
         throw;
     }
+}
+
+MerchantReviewEntryModel MerchantReviewDao::setUploadedImages(
+    std::uint64_t entryId,
+    const std::string& ownerUserName,
+    const std::string& uploadedImagesJson,
+    std::uint64_t now) const
+{
+    auto pooled = DatabaseConnectionPool::instance().acquire();
+    sql::Connection* connection = pooled.operator->();
+    std::unique_ptr<sql::PreparedStatement> statement(
+        connection->prepareStatement(
+            "UPDATE merchantReviewEntry SET uploadedImagesJson = ?, updatedAt = ? "
+            "WHERE entryId = ? AND ownerUserName = ? AND status = 0"));
+    statement->setString(1, uploadedImagesJson);
+    statement->setUInt64(2, now);
+    statement->setUInt64(3, entryId);
+    statement->setString(4, ownerUserName);
+    if (statement->executeUpdate() == 0)
+        throw std::runtime_error("Merchant review not found or not owned");
+    return getEntry(connection, entryId, ownerUserName);
 }
 
 void MerchantReviewDao::removeEntry(
