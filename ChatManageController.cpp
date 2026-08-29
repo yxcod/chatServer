@@ -21,6 +21,8 @@ int jsonInt(const Json::Value& value);
 
 std::string notificationBody(const Json::Value& message)
 {
+    // 隐私消息的正文只能存在于在线会话内存中，任何系统推送或摘要都不得泄露。
+    if (message.get("privacyMode", false).asBool()) return "[隐私信息]";
     const int type = jsonInt(message["msgType"]);
     if (type == 1) return message["msgContent"].asString();
     if (type == 2) return "[图片]";

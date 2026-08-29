@@ -54,14 +54,6 @@ namespace {
 		return {};
 	}
 
-	bool extensionMatchesMime(const std::string& filename, const std::string& mime) {
-		auto extension = lowercase(std::filesystem::path(filename).extension().string());
-		if (mime == "image/jpeg") return extension == ".jpg" || extension == ".jpeg";
-		if (mime == "image/png") return extension == ".png";
-		if (mime == "image/webp") return extension == ".webp";
-		return false;
-	}
-
 	std::string detectVideoMime(const std::string& filename, std::string_view data) {
 		const auto extension = lowercase(std::filesystem::path(filename).extension().string());
 		if (data.size() < 12 || data.substr(4, 4) != "ftyp") return {};
@@ -347,8 +339,8 @@ namespace api {
 			}
 
 			const auto mime = detectImageMime(uploadedFile.fileContent());
-			if (mime.empty() || !extensionMatchesMime(requestedName, mime)) {
-				callback(jsonResponse(108, "Only matching JPEG, PNG and WebP images are supported", drogon::k415UnsupportedMediaType));
+			if (mime.empty()) {
+				callback(jsonResponse(108, "Only JPEG, PNG and WebP images are supported", drogon::k415UnsupportedMediaType));
 				return;
 			}
 

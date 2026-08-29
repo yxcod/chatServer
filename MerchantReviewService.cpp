@@ -369,6 +369,10 @@ Json::Value MerchantReviewService::setUploadedImages(
     catch (const std::exception& error)
     {
         std::cerr << "Set merchant review images failed: " << error.what() << '\n';
+        const std::string detail = error.what();
+        if (detail.find("uploadedImagesJson") != std::string::npos)
+            return response(103,
+                "Database migration required: run sql/merchant_review_uploaded_images.sql");
         return response(102, "Failed to update merchant images");
     }
 }
