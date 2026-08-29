@@ -425,6 +425,34 @@ void ChatWSServer::notifyGroupMemberRoleUpdated(
     for (const auto& recipient : recipients) recipient->send(payload);
 }
 
+void ChatWSServer::notifyGroupMemberMuteUpdated(
+    const std::vector<std::string>& memberIds,
+    uint64_t groupId,
+    const std::string& targetUserId,
+    bool muted,
+    const std::string& operatorId)
+{
+    Json::Value event;
+    event["type"] = "groupMemberMuteUpdated";
+    event["groupId"] = Json::UInt64(groupId);
+    event["userName"] = targetUserId;
+    event["muted"] = muted;
+    event["operatorId"] = operatorId;
+    const std::string payload = jsonString(event);
+
+    std::vector<WebSocketConnectionPtr> recipients;
+    {
+        std::lock_guard<std::mutex> lock(connMutex);
+        for (const auto& memberId : memberIds)
+        {
+            const auto it = onlineUsers.find(memberId);
+            if (it != onlineUsers.end() && it->second && it->second->connected())
+                recipients.push_back(it->second);
+        }
+    }
+    for (const auto& recipient : recipients) recipient->send(payload);
+}
+
 void ChatWSServer::notifyGroupSystemMessages(
     const std::vector<std::string>& memberIds,
     const Json::Value& messages)
@@ -740,6 +768,17 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
 		}
 		int groupId = jsonMsg["receiveId"].asInt();
 		std::vector<std::string> userIds = groupService.getUserIds(groupId);
+		if (GroupMemberDao().isMemberMuted(
+			static_cast<uint64_t>(groupId), sender))
+		{
+			Json::Value failure = jsonMsg;
+			failure["type"] = "groupChatCallback";
+			failure["code"] = 103;
+			failure["clientMsgId"] = jsonMsg["msgId"];
+			failure["error"] = "sender is muted in this group";
+			conn->send(jsonString(failure));
+			return;
+		}
 		if (jsonMsg.get("privacyMode", false).asBool())
 		{
 			if (std::find(userIds.begin(), userIds.end(), sender) == userIds.end())

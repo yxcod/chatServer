@@ -264,15 +264,32 @@ public:
 		Logger::GetInstance().debugJson(request);
 		GroupService groupService;
 		const Json::Value result = groupService.updateGroupMemberInfo(request);
-		if (result["code"].asInt() == 100 && request.isMember("role"))
+		if (result["code"].asInt() == 100)
 		{
 			const auto members = groupService.getUserIds(request["groupId"].asInt());
-			ChatWSServer::notifyGroupMemberRoleUpdated(
-				members,
-				request["groupId"].asUInt64(),
-				request["userName"].asString(),
-				static_cast<uint8_t>(request["role"].asUInt()),
-				*authenticatedUser);
+			if (request.isMember("role"))
+			{
+				ChatWSServer::notifyGroupMemberRoleUpdated(
+					members,
+					request["groupId"].asUInt64(),
+					request["userName"].asString(),
+					static_cast<uint8_t>(request["role"].asUInt()),
+					*authenticatedUser);
+			}
+			if (request.isMember("muted"))
+			{
+				ChatWSServer::notifyGroupMemberMuteUpdated(
+					members,
+					request["groupId"].asUInt64(),
+					request["userName"].asString(),
+					request["muted"].asBool(),
+					*authenticatedUser);
+			}
+			if (result["systemMessages"].isArray())
+			{
+				ChatWSServer::notifyGroupSystemMessages(
+					members, result["systemMessages"]);
+			}
 		}
 		callback(HttpResponse::newHttpJsonResponse(result));
 	}

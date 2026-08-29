@@ -12,10 +12,13 @@ bool GroupMemberDao::addMember(GroupMemberModel& member)
         std::unique_ptr<sql::PreparedStatement> pstmt(
             con->prepareStatement(
                 "INSERT INTO groupMember "
-                "(groupId, userId, role, joinTime, quitTime, isQuit, groupNickName) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?) "
+                "(groupId, userId, role, joinTime, quitTime, isQuit, groupNickName, "
+                "isMuted, mutedBy, mutedAt) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
                 "ON DUPLICATE KEY UPDATE "
-                "isQuit = 0"));
+                "role = VALUES(role), joinTime = VALUES(joinTime), quitTime = 0, "
+                "isQuit = 0, groupNickName = VALUES(groupNickName), "
+                "isMuted = 0, mutedBy = '', mutedAt = 0"));
 
         pstmt->setUInt64(1, member.getGroupId());
         pstmt->setString(2, member.getUserId());
@@ -25,6 +28,9 @@ bool GroupMemberDao::addMember(GroupMemberModel& member)
         pstmt->setUInt64(5, member.getQuitTime());   // 未退出可约定为 0
         pstmt->setUInt(6, member.getIsQuit());
         pstmt->setString(7, member.getGroupNickName());
+        pstmt->setUInt(8, member.getIsMuted());
+        pstmt->setString(9, member.getMutedBy());
+        pstmt->setUInt64(10, member.getMutedAt());
 
         pstmt->executeUpdate();
 
@@ -58,7 +64,7 @@ std::vector<GroupMemberModel> GroupMemberDao::getMembersByGroup(uint64_t groupId
             con->prepareStatement(
                 "SELECT id, groupId, userId, role, "
                 "joinTime, quitTime, "
-                "isQuit, groupNickName "
+                "isQuit, groupNickName, isMuted, mutedBy, mutedAt "
                 "FROM groupMember WHERE groupId = ? AND isQuit = 0"));
 
         pstmt->setUInt64(1, groupId);
@@ -74,6 +80,9 @@ std::vector<GroupMemberModel> GroupMemberDao::getMembersByGroup(uint64_t groupId
             m.setQuitTime(res->getUInt64("quitTime"));
             m.setIsQuit(static_cast<uint8_t>(res->getUInt("isQuit")));
             m.setGroupNickName(res->getString("groupNickName"));
+            m.setIsMuted(static_cast<uint8_t>(res->getUInt("isMuted")));
+            m.setMutedBy(res->getString("mutedBy"));
+            m.setMutedAt(res->getUInt64("mutedAt"));
             members.push_back(std::move(m));
         }
     }
@@ -94,7 +103,7 @@ std::vector<GroupMemberModel> GroupMemberDao::getGroupsByUser(const std::string&
             con->prepareStatement(
                 "SELECT id, groupId, userId, role, "
                 "joinTime, quitTime, "
-                "isQuit, groupNickName "
+                "isQuit, groupNickName, isMuted, mutedBy, mutedAt "
                 "FROM groupMember "
                 "WHERE userId = ? AND isQuit = 0"));
 
@@ -111,6 +120,9 @@ std::vector<GroupMemberModel> GroupMemberDao::getGroupsByUser(const std::string&
             m.setQuitTime(res->getUInt64("quitTime"));
             m.setIsQuit(static_cast<uint8_t>(res->getUInt("isQuit")));
             m.setGroupNickName(res->getString("groupNickName"));
+            m.setIsMuted(static_cast<uint8_t>(res->getUInt("isMuted")));
+            m.setMutedBy(res->getString("mutedBy"));
+            m.setMutedAt(res->getUInt64("mutedAt"));
             result.push_back(std::move(m));
         }
     }
@@ -240,6 +252,55 @@ bool GroupMemberDao::updateGroupRole(uint64_t groupId,
         pstmt->setString(3, userId);
 
         return pstmt->executeUpdate() > 0;
+    }
+    catch (const std::exception& e)
+    {
+        Logger::GetInstance().error(e.what());
+    }
+    return false;
+}
+
+bool GroupMemberDao::updateMuteState(uint64_t groupId,
+    const std::string& userId,
+    bool isMuted,
+    const std::string& operatorId,
+    uint64_t updatedAt)
+{
+    try
+    {
+        auto con = Logger::GetInstance().createConnection();
+        std::unique_ptr<sql::PreparedStatement> pstmt(
+            con->prepareStatement(
+                "UPDATE groupMember SET isMuted = ?, mutedBy = ?, mutedAt = ? "
+                "WHERE groupId = ? AND userId = ? AND isQuit = 0"));
+        pstmt->setUInt(1, isMuted ? 1 : 0);
+        pstmt->setString(2, isMuted ? operatorId : "");
+        pstmt->setUInt64(3, isMuted ? updatedAt : 0);
+        pstmt->setUInt64(4, groupId);
+        pstmt->setString(5, userId);
+        return pstmt->executeUpdate() > 0;
+    }
+    catch (const std::exception& e)
+    {
+        Logger::GetInstance().error(e.what());
+    }
+    return false;
+}
+
+bool GroupMemberDao::isMemberMuted(
+    uint64_t groupId, const std::string& userId) const
+{
+    try
+    {
+        auto con = Logger::GetInstance().createConnection();
+        std::unique_ptr<sql::PreparedStatement> pstmt(
+            con->prepareStatement(
+                "SELECT isMuted FROM groupMember "
+                "WHERE groupId = ? AND userId = ? AND isQuit = 0 LIMIT 1"));
+        pstmt->setUInt64(1, groupId);
+        pstmt->setString(2, userId);
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+        return res->next() && res->getUInt("isMuted") != 0;
     }
     catch (const std::exception& e)
     {

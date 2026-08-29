@@ -108,6 +108,9 @@ Json::Value GroupService::getGroupMembers(const Json::Value& groupInfo)
 		item["isQuit"] = static_cast<int>(m.getIsQuit());          // 0-未退出 1-已退出
 		item["groupNickName"] = m.getGroupNickName();
 		item["avatar"] = userInfo.getAvatar();
+		item["isMuted"] = static_cast<int>(m.getIsMuted());
+		item["mutedBy"] = m.getMutedBy();
+		item["mutedAt"] = Json::UInt64(m.getMutedAt());
 		arr.append(item);
 	}
 
@@ -646,6 +649,34 @@ Json::Value GroupService::updateGroupMemberInfo(const Json::Value& memberInfo)
 		response["msg"] = "operator is not an active group member";
 		return response;
 	}
+	const UserInfo operatorInfo = UserInfoDao().getUserinfo(operatorId);
+	const UserInfo targetInfo = UserInfoDao().getUserinfo(userId);
+	const std::string operatorNickname = operatorInfo.getNickName().empty()
+		? operatorId : operatorInfo.getNickName();
+	const std::string targetNickname = targetInfo.getNickName().empty()
+		? userId : targetInfo.getNickName();
+	auto persistSystemMessage = [&](const std::string& kind,
+		const std::string& content) -> Json::Value
+	{
+		Json::Value metadata;
+		metadata["kind"] = kind;
+		metadata["userId"] = userId;
+		metadata["nickname"] = targetNickname;
+		metadata["operatorId"] = operatorId;
+		metadata["operatorNickname"] = operatorNickname;
+		Json::StreamWriterBuilder writer;
+		writer["indentation"] = "";
+		Json::Value request;
+		request["type"] = "groupChat";
+		request["msgId"] = Json::UInt64(Logger::GetInstance().getcurrentTime());
+		request["sendUserId"] = operatorId;
+		request["receiveId"] = Json::UInt64(groupId);
+		request["receiveType"] = 2;
+		request["msgType"] = 6;
+		request["msgContent"] = content;
+		request["extendInfo"] = Json::writeString(writer, metadata);
+		return handleGroupMessage(request);
+	};
 	//更新成员昵称
 	if (memberInfo.isMember("nickName"))
 	{
@@ -681,9 +712,62 @@ Json::Value GroupService::updateGroupMemberInfo(const Json::Value& memberInfo)
 			response["groupId"] = Json::UInt64(groupId);
 			response["userName"] = userId;
 			response["role"] = roleId;
+			const std::string content = roleId == 1
+				? operatorNickname + u8"\u5C06" + targetNickname +
+					u8"\u8BBE\u4E3A\u7BA1\u7406\u5458"
+				: operatorNickname + u8"\u5DF2\u53D6\u6D88" + targetNickname +
+					u8"\u7684\u7BA1\u7406\u5458\u8EAB\u4EFD";
+			Json::Value systemMessages(Json::arrayValue);
+			const Json::Value systemMessage = persistSystemMessage(
+				"group_member_role_updated", content);
+			if (systemMessage["code"].asInt() == 100)
+				systemMessages.append(systemMessage);
+			response["systemMessages"] = systemMessages;
 			return response;
 		}
 
+	}
+	if (memberInfo.isMember("muted"))
+	{
+		const auto targetRole = groupMemberDao.getActiveMemberRole(groupId, userId);
+		const bool canMuteTarget = targetRole && operatorId != userId &&
+			((*operatorRole == 2 && *targetRole < 2) ||
+			 (*operatorRole == 1 && *targetRole == 0));
+		if (!canMuteTarget)
+		{
+			response["code"] = 103;
+			response["msg"] = "insufficient permission to update mute state";
+			return response;
+		}
+		const bool muted = memberInfo["muted"].asBool();
+		if (groupMemberDao.isMemberMuted(groupId, userId) == muted)
+		{
+			response["code"] = 100;
+			response["groupId"] = Json::UInt64(groupId);
+			response["userName"] = userId;
+			response["muted"] = muted;
+			response["systemMessages"] = Json::Value(Json::arrayValue);
+			return response;
+		}
+		if (groupMemberDao.updateMuteState(groupId, userId, muted,
+			operatorId, Logger::GetInstance().getcurrentTime()))
+		{
+			response["code"] = 100;
+			response["groupId"] = Json::UInt64(groupId);
+			response["userName"] = userId;
+			response["muted"] = muted;
+			const std::string content = muted
+				? operatorNickname + u8"\u7981\u8A00\u4E86" + targetNickname
+				: operatorNickname + u8"\u5DF2\u89E3\u9664" + targetNickname +
+					u8"\u7684\u7981\u8A00";
+			Json::Value systemMessages(Json::arrayValue);
+			const Json::Value systemMessage = persistSystemMessage(
+				muted ? "group_member_muted" : "group_member_unmuted", content);
+			if (systemMessage["code"].asInt() == 100)
+				systemMessages.append(systemMessage);
+			response["systemMessages"] = systemMessages;
+			return response;
+		}
 	}
 	return response;
 }
@@ -826,6 +910,12 @@ Json::Value GroupService::handleGroupMessage(const Json::Value& jsonMsg)
 	if (msgType < 1 || msgType > 6)
 	{
 		response["error"] = "unsupported group message type";
+		return response;
+	}
+	if (msgType != 6 && GroupMemberDao().isMemberMuted(
+		static_cast<uint64_t>(groupId), sender))
+	{
+		response["error"] = "sender is muted in this group";
 		return response;
 	}
 

@@ -37,6 +37,12 @@ public:
     bool updateGroupRole(uint64_t groupId,
         const std::string& userId,
         uint8_t role);
+    bool updateMuteState(uint64_t groupId,
+        const std::string& userId,
+        bool isMuted,
+        const std::string& operatorId,
+        uint64_t updatedAt);
+    bool isMemberMuted(uint64_t groupId, const std::string& userId) const;
     // 根据 groupId 删除该群的所有成员记录
     bool deleteByGroupId(uint64_t groupId);
 

@@ -5,13 +5,13 @@
 #include <sstream>
 
 // GroupMemberModel.h
-// ¶ÔÓ¦Êı¾İ¿â groupMember ±íµÄÄ£ĞÍÀà
+// å¯¹åº”æ•°æ®åº“ groupMember è¡¨çš„æ¨¡å‹ç±»
 class GroupMemberModel {
 public:
-    // Ä¬ÈÏ¹¹Ôì
+    // é»˜è®¤æ„é€ 
     GroupMemberModel() = default;
 
-    // È«×Ö¶Î¹¹Ôì
+    // å…¨å­—æ®µæ„é€ 
     GroupMemberModel(uint64_t id,
         uint64_t groupId,
         std::string userId,
@@ -19,7 +19,10 @@ public:
         uint64_t joinTime,
         uint64_t quitTime,
         uint8_t isQuit,
-        std::string groupNickName)
+        std::string groupNickName,
+        uint8_t isMuted = 0,
+        std::string mutedBy = {},
+        uint64_t mutedAt = 0)
         : id(id),
         groupId(groupId),
         userId(std::move(userId)),
@@ -27,10 +30,13 @@ public:
         joinTime(joinTime),
         quitTime(quitTime),
         isQuit(isQuit),
-        groupNickName(std::move(groupNickName)) {
+        groupNickName(std::move(groupNickName)),
+        isMuted(isMuted),
+        mutedBy(std::move(mutedBy)),
+        mutedAt(mutedAt) {
     }
 
-    // ¿½±´ÓëÒÆ¶¯Ä¬ÈÏ
+    // æ‹·è´ä¸ç§»åŠ¨é»˜è®¤
     GroupMemberModel(const GroupMemberModel&) = default;
     GroupMemberModel(GroupMemberModel&&) noexcept = default;
     GroupMemberModel& operator=(const GroupMemberModel&) = default;
@@ -43,10 +49,13 @@ public:
     uint64_t getGroupId() const noexcept { return groupId; }
     const std::string& getUserId() const noexcept { return userId; }
     uint8_t getRole() const noexcept { return role; }
-    uint64_t getJoinTime() const noexcept { return joinTime; }  // Ê±¼ä´Á
-    uint64_t getQuitTime() const noexcept { return quitTime; }  // Ê±¼ä´Á
+    uint64_t getJoinTime() const noexcept { return joinTime; }  // æ—¶é—´æˆ³
+    uint64_t getQuitTime() const noexcept { return quitTime; }  // æ—¶é—´æˆ³
     uint8_t getIsQuit() const noexcept { return isQuit; }
     const std::string& getGroupNickName() const noexcept { return groupNickName; }
+    uint8_t getIsMuted() const noexcept { return isMuted; }
+    const std::string& getMutedBy() const noexcept { return mutedBy; }
+    uint64_t getMutedAt() const noexcept { return mutedAt; }
 
     // setters
     void setId(uint64_t v) { id = v; }
@@ -57,8 +66,11 @@ public:
     void setQuitTime(uint64_t v) { quitTime = v; }
     void setIsQuit(uint8_t v) { isQuit = v; }
     void setGroupNickName(const std::string& v) { groupNickName = v; }
+    void setIsMuted(uint8_t v) { isMuted = v; }
+    void setMutedBy(const std::string& v) { mutedBy = v; }
+    void setMutedAt(uint64_t v) { mutedAt = v; }
 
-    // µ÷ÊÔÓÃ×Ö·û´®Êä³ö
+    // è°ƒè¯•ç”¨å­—ç¬¦ä¸²è¾“å‡º
     std::string toString() const
     {
         std::ostringstream os;
@@ -70,18 +82,24 @@ public:
         os << "joinTime=" << joinTime << ", ";
         os << "quitTime=" << quitTime << ", ";
         os << "isQuit=" << static_cast<int>(isQuit) << ", ";
-        os << "groupNickName=" << groupNickName;
+        os << "groupNickName=" << groupNickName << ", ";
+        os << "isMuted=" << static_cast<int>(isMuted) << ", ";
+        os << "mutedBy=" << mutedBy << ", ";
+        os << "mutedAt=" << mutedAt;
         os << "}";
         return os.str();
     }
 
 private:
-    uint64_t id = 0;           // Ö÷¼üID
-    uint64_t groupId = 0;      // ÈºÁÄID
-    std::string userId;        // ÓÃ»§ID£¨×Ö·û´®ĞÎÊ½£©
-    uint8_t role = 0;          // ³ÉÔ±½ÇÉ«£º0-ÆÕÍ¨³ÉÔ± 1-¹ÜÀíÔ± 2-ÈºÖ÷
-    uint64_t joinTime = 0;     // ¼ÓÈëÊ±¼ä£¬Ê±¼ä´Á
-    uint64_t quitTime = 0;     // ÍË³öÊ±¼äÊ±¼ä´Á£¬0 ±íÊ¾Î´ÍË³ö
-    uint8_t isQuit = 0;        // ÊÇ·ñÍË³ö£º0-Î´ÍË³ö 1-ÒÑÍË³ö
-    std::string groupNickName; // ÔÚÈºÀïµÄêÇ³Æ
+    uint64_t id = 0;           // ä¸»é”®ID
+    uint64_t groupId = 0;      // ç¾¤èŠID
+    std::string userId;        // ç”¨æˆ·IDï¼ˆå­—ç¬¦ä¸²å½¢å¼ï¼‰
+    uint8_t role = 0;          // æˆå‘˜è§’è‰²ï¼š0-æ™®é€šæˆå‘˜ 1-ç®¡ç†å‘˜ 2-ç¾¤ä¸»
+    uint64_t joinTime = 0;     // åŠ å…¥æ—¶é—´ï¼Œæ—¶é—´æˆ³
+    uint64_t quitTime = 0;     // é€€å‡ºæ—¶é—´æ—¶é—´æˆ³ï¼Œ0 è¡¨ç¤ºæœªé€€å‡º
+    uint8_t isQuit = 0;        // æ˜¯å¦é€€å‡ºï¼š0-æœªé€€å‡º 1-å·²é€€å‡º
+    std::string groupNickName; // åœ¨ç¾¤é‡Œçš„æ˜µç§°
+    uint8_t isMuted = 0;       // æ˜¯å¦è¢«ç¦è¨€ï¼š0-å¦ 1-æ˜¯
+    std::string mutedBy;       // æ‰§è¡Œç¦è¨€çš„ç¾¤æˆå‘˜ ID
+    uint64_t mutedAt = 0;      // ç¦è¨€æ—¶é—´æˆ³
 };

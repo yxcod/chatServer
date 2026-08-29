@@ -48,6 +48,13 @@ public:
         uint8_t role,
         const std::string& operatorId);
 
+    static void notifyGroupMemberMuteUpdated(
+        const std::vector<std::string>& memberIds,
+        uint64_t groupId,
+        const std::string& targetUserId,
+        bool muted,
+        const std::string& operatorId);
+
     static void notifyGroupSystemMessages(
         const std::vector<std::string>& memberIds,
         const Json::Value& messages);
