@@ -1,0 +1,5 @@
+{
+  "appId": "YOUR_32_CHARACTER_AGORA_APP_ID",
+  "appCertificate": "YOUR_32_CHARACTER_PRIMARY_CERTIFICATE",
+  "tokenExpireSeconds": 3600
+}

@@ -1,6 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <ClInclude Include="AgoraRtcTokenController.h"><Filter>源文件\Control</Filter></ClInclude>
+    <ClInclude Include="AgoraRtcTokenService.h"><Filter>源文件\Service</Filter></ClInclude>
     <Filter Include="源文件">
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
@@ -32,6 +34,8 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="AgoraRtcTokenController.cpp"><Filter>源文件\Control</Filter></ClCompile>
+    <ClCompile Include="AgoraRtcTokenService.cpp"><Filter>源文件\Service</Filter></ClCompile>
     <ClInclude Include="UserModel.h">
       <Filter>源文件\Model</Filter>
     </ClInclude>

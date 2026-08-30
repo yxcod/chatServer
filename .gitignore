@@ -35,6 +35,7 @@ config.json
 /HEAD
 /config/*
 !/config/tencent_asr.example.json
+!/config/agora_rtc.example.json
 /description
 /hooks/
 /info/
