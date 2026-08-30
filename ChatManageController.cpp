@@ -677,6 +677,127 @@ void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,
             it->second->send(forward);
         }
     }
+	// Unified private/group video-call signaling. RTC media remains on Agora;
+	// this channel only coordinates invite/accept/reject/end state.
+    else if (msgType == "callSignal")
+    {
+        const std::string authenticatedUser = connectedUserName(conn);
+        const std::string claimedSender = jsonMsg["sender"].asString();
+        const std::string action = jsonMsg["action"].asString();
+        const std::string kind = jsonMsg["callKind"].asString();
+        const std::string callId = jsonMsg["callId"].asString();
+        const std::string channelName = jsonMsg["channelName"].asString();
+        if (authenticatedUser.empty() || claimedSender != authenticatedUser ||
+            callId.empty() || channelName.empty() || action.empty())
+        {
+            return;
+        }
+
+        Json::Value event = jsonMsg;
+        event["type"] = "callSignal";
+        event["sender"] = authenticatedUser;
+        event["senderName"] = displayNameForUser(authenticatedUser);
+
+        auto sendUnavailable = [&](const std::string& reason) {
+            Json::Value failure = event;
+            failure["action"] = "unavailable";
+            failure["sender"] = "server";
+            failure["senderName"] = "server";
+            failure["receiver"] = authenticatedUser;
+            failure["reason"] = reason;
+            conn->send(jsonString(failure));
+        };
+
+        if (kind == "private")
+        {
+            const std::string receiver = jsonMsg["receiver"].asString();
+            if (receiver.empty() || receiver == authenticatedUser) return;
+            if (action == "invite")
+            {
+                if (!FriendRelationDao().hasAcceptedRelation(
+                        authenticatedUser, receiver))
+                {
+                    sendUnavailable("not_friends");
+                    return;
+                }
+            }
+            sendToUsers({receiver}, event);
+            if (action == "invite")
+            {
+                Json::Value extras;
+                extras["eventType"] = "videoCallInvite";
+                extras["callId"] = callId;
+                extras["callKind"] = "private";
+                extras["channelName"] = channelName;
+                extras["senderId"] = authenticatedUser;
+                extras["senderName"] = displayNameForUser(authenticatedUser);
+                extras["receiver"] = receiver;
+                extras["time"] = event.get("time", Json::Int64(0));
+                extras["token"] = event.get("token", "");
+                JPushService::pushToUsers(
+                    {receiver}, displayNameForUser(authenticatedUser),
+                    "Incoming video call", extras);
+            }
+            return;
+        }
+
+        if (kind == "group")
+        {
+            const uint64_t groupId = jsonMsg["groupId"].asUInt64();
+            if (groupId == 0 ||
+                !GroupMemberDao().isUserInGroup(groupId, authenticatedUser))
+            {
+                sendUnavailable("not_group_member");
+                return;
+            }
+            const auto members = GroupMemberDao().getMembersByGroup(groupId);
+            std::unordered_set<std::string> targets;
+            const std::string receiver = jsonMsg["receiver"].asString();
+            if ((action == "accept" || action == "reject" ||
+                 action == "busy") && !receiver.empty())
+            {
+                const bool receiverInGroup = std::any_of(
+                    members.begin(), members.end(),
+                    [&receiver](const GroupMemberModel& member) {
+                        return member.getUserId() == receiver;
+                    });
+                if (receiverInGroup) targets.insert(receiver);
+            }
+            else
+            {
+                for (const auto& member : members)
+                {
+                    if (member.getUserId() != authenticatedUser)
+                        targets.insert(member.getUserId());
+                }
+            }
+            if (targets.empty())
+            {
+                if (action == "invite") sendUnavailable("no_group_members");
+                return;
+            }
+            sendToUsers(targets, event);
+            if (action == "invite")
+            {
+                std::vector<std::string> targetList(targets.begin(), targets.end());
+                Json::Value extras;
+                extras["eventType"] = "groupVideoCallInvite";
+                extras["callId"] = callId;
+                extras["callKind"] = "group";
+                extras["channelName"] = channelName;
+                extras["senderId"] = authenticatedUser;
+                extras["senderName"] = displayNameForUser(authenticatedUser);
+                extras["groupId"] = Json::UInt64(groupId);
+                extras["groupName"] = event.get("groupName", "Group video call");
+                extras["time"] = event.get("time", Json::Int64(0));
+                extras["token"] = event.get("token", "");
+                JPushService::pushToUsers(
+                    targetList,
+                    jsonMsg.get("groupName", "Group video call").asString(),
+                    "Group video call invitation", extras);
+            }
+        }
+    }
 	// 视频通话邀请
     else if (msgType == "videoCallInvite")
     {
