@@ -19,6 +19,13 @@ namespace
 std::string jsonString(const Json::Value& value);
 int jsonInt(const Json::Value& value);
 
+JwtTokenUtil& chatTokenUtil()
+{
+    static JwtTokenUtil instance(
+        "c9bb708f526d420ea88d83cd316d662921646869efaf425eb150ab99d20f48bc");
+    return instance;
+}
+
 std::string notificationBody(const Json::Value& message)
 {
     // 隐私消息的正文只能存在于在线会话内存中，任何系统推送或摘要都不得泄露。
@@ -527,9 +534,18 @@ void ChatWSServer::notifyAutomaticFriendGreeting(
 void ChatWSServer::handleNewConnection(const HttpRequestPtr& req,
     const WebSocketConnectionPtr& conn)
 {
-    auto userName = req->getParameter("userName");
-    if (userName.empty())
+    const std::string userName = req->getParameter("userName");
+    const auto token = chatTokenUtil().extractBearerToken(req);
+    const auto payload = token.has_value()
+        ? chatTokenUtil().parsePayload(*token)
+        : std::unordered_map<std::string, std::string>{};
+    const auto userIt = payload.find("userId");
+    if (userName.empty() || userIt == payload.end() || userIt->second != userName)
     {
+        Json::Value event;
+        event["type"] = "sessionInvalidated";
+        event["message"] = u8"登录状态已失效，请重新登录";
+        conn->send(jsonString(event));
         conn->shutdown();
         return;
     }
@@ -537,13 +553,30 @@ void ChatWSServer::handleNewConnection(const HttpRequestPtr& req,
     // 记录当前实例指针
     instance_ = this;
 
+    WebSocketConnectionPtr previousConnection;
     {
         std::lock_guard<std::mutex> lock(connMutex);
+        const auto existing = onlineUsers.find(userName);
+        if (existing != onlineUsers.end() && existing->second != conn)
+        {
+            previousConnection = existing->second;
+        }
         onlineUsers[userName] = conn;
     }
 
+    if (previousConnection && previousConnection->connected())
+    {
+        Json::Value event;
+        event["type"] = "sessionReplaced";
+        event["message"] = u8"你的账号已在其他设备登录";
+        event["replacedAt"] = Json::UInt64(
+            Logger::GetInstance().getcurrentTime());
+        previousConnection->send(jsonString(event));
+        previousConnection->shutdown();
+    }
+
     UserInfoService().handleHeartbeat(userName);
-    broadcastPresence(userName, true);
+    if (!previousConnection) broadcastPresence(userName, true);
 }
 
 void ChatWSServer::handleNewMessage(const WebSocketConnectionPtr& conn,

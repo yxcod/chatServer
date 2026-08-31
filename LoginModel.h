@@ -1,8 +1,9 @@
 #pragma once
 #include <string>
-#include <ctime>  // ÓÃÓÚÊ±¼äÀàĞÍ£¨Êı¾İ¿â DATETIME ¶ÔÓ¦ C++ tm ½á¹¹Ìå£©
+#include <ctime>  // ç”¨äºæ—¶é—´ç±»å‹ï¼ˆæ•°æ®åº“ DATETIME å¯¹åº” C++ tm ç»“æ„ä½“ï¼‰
 #include <sstream>
 #include <iomanip>
+#include <cstdint>
 class LoginModel
 {
 public:
@@ -11,24 +12,26 @@ public:
 	LoginModel(const std::string& accountVaue, const std::string& passwordVaue, const std::int32_t& state,
 		const std::tm& time);
 
-	//»ñÈ¡ÓÃ»§Ãû
+	//è·å–ç”¨æˆ·å
 	std::string getAccount() const;
-	//»ñÈ¡ÃÜÂë
+	//è·å–å¯†ç 
 	std::string getPassword()const;
-	//»ñÈ¡ÕËºÅ×´Ì¬ 0 Õı³£ 1·â½û
+	//è·å–è´¦å·çŠ¶æ€ 0 æ­£å¸¸ 1å°ç¦
 	std::int32_t getAccountState()const;
-	//»ñÈ¡×¢²áÊ±¼ä
+	//è·å–æ³¨å†Œæ—¶é—´
 	std::tm getRegisterTime()const;
+	std::uint64_t getSessionVersion() const;
 
 	void setAccount(const std::string& accountVaue);
 	void setPasswor(const std::string& passwordVaue);
 	void setAccountState(const std::int32_t& state);
 	void setRegisterTime(const std::tm& time);
+	void setSessionVersion(std::uint64_t value);
 
 private:
 	std::string account;
 	std::string password;
 	std::int32_t isBan;
 	std::tm registerTime;
+	std::uint64_t sessionVersion{};
 };
-

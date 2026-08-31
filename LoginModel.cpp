@@ -6,6 +6,7 @@ LoginModel::LoginModel()
 	account = "";
 	password = "";
 	isBan = 0;
+	sessionVersion = 0;
 	time_t now = time(nullptr);
 	std::tm localnow{};
 	localtime_s(&localnow, &now);
@@ -40,6 +41,11 @@ std::tm LoginModel::getRegisterTime() const
 	return registerTime;
 }
 
+std::uint64_t LoginModel::getSessionVersion() const
+{
+	return sessionVersion;
+}
+
 void LoginModel::setAccount(const std::string& accountVaue)
 {
 	account = accountVaue;
@@ -58,4 +64,9 @@ void LoginModel::setAccountState(const std::int32_t& state)
 void LoginModel::setRegisterTime(const std::tm& time)
 {
 	registerTime = time;
+}
+
+void LoginModel::setSessionVersion(std::uint64_t value)
+{
+	sessionVersion = value;
 }

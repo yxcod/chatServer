@@ -72,7 +72,7 @@ Json::Value UserLoginService::registerUser(const std::string& account, const std
 
 		return returnJson;
 	}
-	
+	return returnJson;
 
 }
 
@@ -104,9 +104,18 @@ Json::Value UserLoginService::login(const std::string& account, const std::strin
 		}
 		else
 		{
+			const std::uint64_t sessionVersion = loginDao.createSession(account);
+			if (sessionVersion == 0)
+			{
+				returnJson["code"] = 105;
+				return returnJson;
+			}
 			returnJson["code"] = 100;
-			// 鐢熸垚 token
-			returnJson["token"] = tokenUtil->generateToken(account, "ios");
+			std::unordered_map<std::string, std::string> payload;
+			payload["userId"] = account;
+			payload["deviceId"] = "app";
+			payload["sessionVersion"] = std::to_string(sessionVersion);
+			returnJson["token"] = tokenUtil->generateToken(payload);
 		}
 	}
 	else

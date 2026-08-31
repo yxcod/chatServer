@@ -114,7 +114,7 @@ bool JwtTokenUtil::verifyToken(const std::string& token) {
     std::string exp = payloadStr.substr(expStart + 7, expEnd - (expStart + 7));
     if (!isTokenNotExpired(exp)) return false;
 
-    // A deleted or banned account invalidates every previously issued token.
+    // A deleted/banned account or a newer login invalidates this token.
     const std::string userMarker = "\"userId\":\"";
     const size_t userStart = payloadStr.find(userMarker);
     const size_t userEnd = userStart == std::string::npos
@@ -125,7 +125,24 @@ bool JwtTokenUtil::verifyToken(const std::string& token) {
     const std::string userName = payloadStr.substr(
         userStart + userMarker.size(),
         userEnd - (userStart + userMarker.size()));
-    return LoginDao().isAccountActive(userName);
+    const std::string versionMarker = "\"sessionVersion\":\"";
+    const size_t versionStart = payloadStr.find(versionMarker);
+    const size_t versionEnd = versionStart == std::string::npos
+        ? std::string::npos
+        : payloadStr.find('"', versionStart + versionMarker.size());
+    if (versionStart == std::string::npos || versionEnd == std::string::npos)
+        return false;
+    try
+    {
+        const std::uint64_t version = std::stoull(payloadStr.substr(
+            versionStart + versionMarker.size(),
+            versionEnd - (versionStart + versionMarker.size())));
+        return LoginDao().isSessionActive(userName, version);
+    }
+    catch (...)
+    {
+        return false;
+    }
 }
 
 /**
