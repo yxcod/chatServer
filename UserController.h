@@ -4,6 +4,7 @@
 #include <string>
 #include "UserInfoService.h"
 #include "UserLoginService.h"
+#include "AccountDeletionService.h"
 #include "JwtTokenUtil.h"
 using namespace drogon;
 using namespace drogon::orm;
@@ -17,7 +18,38 @@ public:
 	ADD_METHOD_TO(UserController::userPasswordChange, "/api/user/passwordModify", Post);
 	ADD_METHOD_TO(UserController::userPasswordReset, "/api/user/passwordReset", Post);
 	ADD_METHOD_TO(UserController::userInfoChange, "/api/user/userInfoModify", Post);
+	ADD_METHOD_TO(UserController::deleteAccount, "/api/user/deleteAccount", Post);
 	METHOD_LIST_END
+
+	void deleteAccount(const HttpRequestPtr& req,
+		std::function<void(const HttpResponsePtr&)>&& callback)
+	{
+		Json::Value result;
+		const auto json = req->getJsonObject();
+		JwtTokenUtil tokenUtil(
+			"c9bb708f526d420ea88d83cd316d662921646869efaf425eb150ab99d20f48bc");
+		const auto token = tokenUtil.extractBearerToken(req);
+		if (!json || !json->isMember("password") ||
+			!token || !tokenUtil.verifyToken(*token))
+		{
+			result["code"] = 401;
+			result["message"] = u8"登录状态已失效";
+			callback(HttpResponse::newHttpJsonResponse(result));
+			return;
+		}
+		const auto payload = tokenUtil.parsePayload(*token);
+		const auto user = payload.find("userId");
+		if (user == payload.end() || user->second.empty())
+		{
+			result["code"] = 401;
+			result["message"] = u8"登录状态已失效";
+			callback(HttpResponse::newHttpJsonResponse(result));
+			return;
+		}
+		callback(HttpResponse::newHttpJsonResponse(
+			AccountDeletionService().deleteAccount(
+				user->second, (*json)["password"].asString())));
+	}
 	// 用户注册
 	void registerUser(const HttpRequestPtr& req, std::function<void(const HttpResponsePtr&)>&& callback) 
 	{

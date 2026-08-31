@@ -1,6 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <ClInclude Include="AccountDeletionDao.h"><Filter>源文件\Mapper</Filter></ClInclude>
+    <ClInclude Include="AccountDeletionService.h"><Filter>源文件\Service</Filter></ClInclude>
     <ClInclude Include="AgoraRtcTokenController.h"><Filter>源文件\Control</Filter></ClInclude>
     <ClInclude Include="AgoraRtcTokenService.h"><Filter>源文件\Service</Filter></ClInclude>
     <Filter Include="源文件">
@@ -34,6 +36,8 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="AccountDeletionDao.cpp"><Filter>源文件\Mapper</Filter></ClCompile>
+    <ClCompile Include="AccountDeletionService.cpp"><Filter>源文件\Service</Filter></ClCompile>
     <ClCompile Include="AgoraRtcTokenController.cpp"><Filter>源文件\Control</Filter></ClCompile>
     <ClCompile Include="AgoraRtcTokenService.cpp"><Filter>源文件\Service</Filter></ClCompile>
     <ClInclude Include="UserModel.h">

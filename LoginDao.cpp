@@ -3,12 +3,12 @@
 
 int LoginDao::registerAccount(const std::string& account, const std::string& password, const std::string& salt)
 {
-    // Ã¿´Îµ÷ÓÃ´´½¨¶ÀÁ¢Á¬½Ó
+    // æ¯æ¬¡è°ƒç”¨åˆ›å»ºç‹¬ç«‹è¿æ¥
     auto con = Logger::GetInstance().createConnection();
 
     try
     {
-        // ÏÈ¼ì²éÊÇ·ñ´æÔÚ
+        // å…ˆæ£€æŸ¥æ˜¯å¦å­˜åœ¨
         std::string selectSql = "SELECT id FROM login WHERE userAccount = ?";
         std::unique_ptr<sql::PreparedStatement> pstmt(
             con->prepareStatement(selectSql));
@@ -17,11 +17,11 @@ int LoginDao::registerAccount(const std::string& account, const std::string& pas
         std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
         if (res->rowsCount() > 0)
         {
-            // ÕËºÅÒÑ´æÔÚ
+            // è´¦å·å·²å­˜åœ¨
             return -1;
         }
 
-        // ²åÈëĞÂÕËºÅ
+        // æ’å…¥æ–°è´¦å·
         std::string insertSql =
             "INSERT INTO login (userAccount, password, isBan, salt) "
             "VALUES (?, ?, ?, ?)";
@@ -29,7 +29,7 @@ int LoginDao::registerAccount(const std::string& account, const std::string& pas
         pstmt.reset(con->prepareStatement(insertSql));
         pstmt->setString(1, account);
         pstmt->setString(2, password);
-        pstmt->setInt(3, 0);   // ×¢²áÊ±Ä¬ÈÏÎ´·â½û
+        pstmt->setInt(3, 0);   // æ³¨å†Œæ—¶é»˜è®¤æœªå°ç¦
         pstmt->setString(4, salt);
 
         int resultValue = pstmt->executeUpdate();
@@ -41,8 +41,8 @@ int LoginDao::registerAccount(const std::string& account, const std::string& pas
     }
 }
 
-// ½¨Òé£º²»ÒªÔÙ·µ»Ø ResultSet*£¬¶øÊÇ·â×°³ÉÒ»¸ö½á¹¹Ìå/DTO£»
-// ÕâÀï¸ø³öÒ»¸öÊ¾ÀıÊµÏÖ£ºµ÷ÓÃ·½Ö»ÄÃµ½ĞèÒªµÄ×Ö¶Î¡£
+// å»ºè®®ï¼šä¸è¦å†è¿”å› ResultSet*ï¼Œè€Œæ˜¯å°è£…æˆä¸€ä¸ªç»“æ„ä½“/DTOï¼›
+// è¿™é‡Œç»™å‡ºä¸€ä¸ªç¤ºä¾‹å®ç°ï¼šè°ƒç”¨æ–¹åªæ‹¿åˆ°éœ€è¦çš„å­—æ®µã€‚
 LoginInfo LoginDao::loginAccount(const std::string& account)
 {
     LoginInfo info{};
@@ -69,10 +69,29 @@ LoginInfo LoginDao::loginAccount(const std::string& account)
     }
     catch (...)
     {
-        // ³ö´í¾Í±£³Ö found=false
+        // å‡ºé”™å°±ä¿æŒ found=false
     }
 
     return info;
+}
+
+bool LoginDao::isAccountActive(const std::string& account) const
+{
+    if (account.empty()) return false;
+    auto con = Logger::GetInstance().createConnection();
+    try
+    {
+        std::unique_ptr<sql::PreparedStatement> pstmt(
+            con->prepareStatement(
+                "SELECT 1 FROM login WHERE userAccount = ? AND isBan = 0 LIMIT 1"));
+        pstmt->setString(1, account);
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+        return res->next();
+    }
+    catch (...)
+    {
+        return false;
+    }
 }
 
 int LoginDao::changePassword(const std::string& account, const std::string& newPassword)

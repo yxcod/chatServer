@@ -1,4 +1,5 @@
 #include "JwtTokenUtil.h"
+#include "LoginDao.h"
 #include <openssl/hmac.h>   // HMAC-SHA256 签名
 #include <openssl/bio.h>    // Base64 编码解码
 #include <openssl/evp.h>    // 加密算法上下文
@@ -111,7 +112,20 @@ bool JwtTokenUtil::verifyToken(const std::string& token) {
     }
 
     std::string exp = payloadStr.substr(expStart + 7, expEnd - (expStart + 7));
-    return isTokenNotExpired(exp); // 检查是否过期
+    if (!isTokenNotExpired(exp)) return false;
+
+    // A deleted or banned account invalidates every previously issued token.
+    const std::string userMarker = "\"userId\":\"";
+    const size_t userStart = payloadStr.find(userMarker);
+    const size_t userEnd = userStart == std::string::npos
+        ? std::string::npos
+        : payloadStr.find('"', userStart + userMarker.size());
+    if (userStart == std::string::npos || userEnd == std::string::npos)
+        return false;
+    const std::string userName = payloadStr.substr(
+        userStart + userMarker.size(),
+        userEnd - (userStart + userMarker.size()));
+    return LoginDao().isAccountActive(userName);
 }
 
 /**

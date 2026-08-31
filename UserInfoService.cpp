@@ -3,10 +3,16 @@
 #include <unordered_map>
 #include <mutex>
 #include "HeartbeatManager.h"
+#include "LoginDao.h"
 
 Json::Value UserInfoService::getUserAllInfo(const std::string& userId)
 {
-	
+	if (!LoginDao().isAccountActive(userId))
+	{
+		Json::Value unavailable;
+		unavailable["code"] = 101;
+		return unavailable;
+	}
 	UserInfoDao userInfoDao;
 	FriendRelationDao friendRelation;
 	UserInfo userinfo = userInfoDao.getUserinfo(userId);
@@ -55,6 +61,10 @@ Json::Value UserInfoService::modifyUserInfo(const Json::Value& userInfo)
 	UserInfo userinfo;
 	std::string userId = userInfo["userName"].asString();
 	jsonObj["code"] = 101;
+	if (!LoginDao().isAccountActive(userId))
+	{
+		return jsonObj;
+	}
 	try
 	{
 		userinfo.setNickName(userInfo["nickName"].asString());
@@ -83,7 +93,7 @@ Json::Value UserInfoService::modifyUserInfo(const Json::Value& userInfo)
 
 void UserInfoService::handleHeartbeat(const std::string& userName)
 {
-	if (userName.empty())
+	if (userName.empty() || !LoginDao().isAccountActive(userName))
 	{
 		return;
 	}

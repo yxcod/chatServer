@@ -5,6 +5,7 @@
 #include "ChatDao.h"
 #include "ChatService.h"
 #include "UserBlockDao.h"
+#include "LoginDao.h"
 #include <algorithm>
 #include <atomic>
 #include <cctype>
@@ -188,6 +189,13 @@ Json::Value FriendRelationService::sendFriendApply(const Json::Value& jsonValue)
 	if (fromUserId.empty() || toUserId.empty() || fromUserId == toUserId)
 	{
 		response_data["code"] = 99;
+		return response_data;
+	}
+	if (!LoginDao().isAccountActive(fromUserId) ||
+		!LoginDao().isAccountActive(toUserId))
+	{
+		response_data["code"] = 107;
+		response_data["message"] = u8"该账号不存在或已注销";
 		return response_data;
 	}
 	UserInfoDao userInfoDao;

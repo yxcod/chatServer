@@ -1,6 +1,6 @@
 #pragma once
 #include <string>
-#include <ctime>  // 用于时间类型（数据库 DATETIME 对应 C++ tm 结构体）
+#include <ctime>  // 鐢ㄤ簬鏃堕棿绫诲瀷锛堟暟鎹簱 DATETIME 瀵瑰簲 C++ tm 缁撴瀯浣擄級
 #include <sstream>
 #include <iomanip>
 #include "Logger.h"
@@ -21,7 +21,8 @@ public:
 
     LoginInfo loginAccount(const std::string& account);
 
+    bool isAccountActive(const std::string& account) const;
+
     int changePassword(const std::string& account,
         const std::string& newPassword);
 };
-

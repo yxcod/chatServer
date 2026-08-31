@@ -136,6 +136,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="AccountDeletionDao.cpp">
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="AccountDeletionService.cpp">
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="AgoraRtcTokenController.cpp">
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -232,6 +238,8 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="AccountDeletionDao.h" />
+    <ClInclude Include="AccountDeletionService.h" />
     <ClInclude Include="AgoraRtcTokenController.h" />
     <ClInclude Include="AgoraRtcTokenService.h" />
     <ClInclude Include="ChatControl.h" />

@@ -98,9 +98,9 @@ Json::Value UserLoginService::login(const std::string& account, const std::strin
 	if (encryptUtil->verifyPassword(password, info.password, info.salt))
 	{
 		// 璐﹀彿琚皝绂?
-		if (info.isBan == 1)
+		if (info.isBan != 0)
 		{
-			returnJson["code"] = 103;
+			returnJson["code"] = info.isBan == 2 ? 104 : 103;
 		}
 		else
 		{
@@ -132,7 +132,7 @@ Json::Value UserLoginService::changePassword(const std::string& account,
 	LoginInfo info = loginDao.loginAccount(account);
 
 	// 鐢ㄦ埛涓嶅瓨鍦?
-	if (!info.found)
+	if (!info.found || info.isBan != 0)
 	{
 		returnJson["code"] = 102;
 		return returnJson;
@@ -169,7 +169,7 @@ Json::Value UserLoginService::resetPassword(
 	returnJson["code"] = 101;
 
 	const LoginInfo info = loginDao.loginAccount(account);
-	if (!info.found)
+	if (!info.found || info.isBan != 0)
 	{
 		returnJson["code"] = 102;
 		return returnJson;
