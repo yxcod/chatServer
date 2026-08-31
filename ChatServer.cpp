@@ -11,6 +11,7 @@
 #include "MomentController.h"
 #include "MerchantReviewController.h"
 #include "UserSpaceController.h"
+#include "UserBlockController.h"
 #include "GroupResourceController.h"
 #include "UserLocationController.h"
 #include "VoiceTranscriptionController.h"

@@ -1,5 +1,6 @@
 #include "FriendRelationDao.h"
 #include "UserInfoDao.h"
+#include "UserBlockDao.h"
 
 namespace
 {
@@ -57,7 +58,11 @@ void FriendRelationDao::getAllFriendWithUserId(const std::string& userId, const 
             userInfo.setCreateTime(res->getUInt64("createTime"));
             userInfo.setState(res->getUInt("state"));
             userInfo.setModifyTime(res->getUInt64("modifyTime"));
-            userInfoVector.push_back(userInfo);
+            if (!UserBlockDao().isBlockedEitherDirection(
+                    userId, userInfo.getUserAccount()))
+            {
+                userInfoVector.push_back(userInfo);
+            }
         }
     }
     catch (const std::exception& error)
@@ -502,6 +507,10 @@ bool FriendRelationDao::hasAcceptedRelation(const std::string& userId1, const st
 
     try
     {
+        if (UserBlockDao().isBlockedEitherDirection(userId1, userId2))
+        {
+            return false;
+        }
         auto con = Logger::GetInstance().createConnection();
         if (!con)
         {

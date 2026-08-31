@@ -449,3 +449,17 @@ void MerchantReviewDao::lockEntry(sql::Connection* connection,
     std::unique_ptr<sql::ResultSet> result(statement->executeQuery());
     if (!result->next()) throw std::runtime_error("Merchant review not found");
 }
+
+std::string MerchantReviewDao::getOwnerUserName(std::uint64_t entryId) const
+{
+    auto pooled = DatabaseConnectionPool::instance().acquire();
+    std::unique_ptr<sql::PreparedStatement> statement(
+        pooled->prepareStatement(
+            "SELECT ownerUserName FROM merchantReviewEntry "
+            "WHERE entryId = ? AND status = 0 LIMIT 1"));
+    statement->setUInt64(1, entryId);
+    std::unique_ptr<sql::ResultSet> result(statement->executeQuery());
+    return result->next()
+        ? result->getString("ownerUserName").asStdString()
+        : std::string();
+}

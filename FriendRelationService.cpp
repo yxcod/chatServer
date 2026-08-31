@@ -4,6 +4,7 @@
 #include "UserInfoDao.h"
 #include "ChatDao.h"
 #include "ChatService.h"
+#include "UserBlockDao.h"
 #include <algorithm>
 #include <atomic>
 #include <cctype>
@@ -197,6 +198,19 @@ Json::Value FriendRelationService::sendFriendApply(const Json::Value& jsonValue)
 	}
 	response_data["userId"] = userInfo.getUserAccount();
 	response_data["nickname"] = userInfo.getNickName();
+	UserBlockDao blockDao;
+	if (blockDao.isBlockedBy(fromUserId, toUserId))
+	{
+		response_data["code"] = 105;
+		response_data["message"] = u8"请先将对方移出黑名单";
+		return response_data;
+	}
+	if (blockDao.isBlockedBy(toUserId, fromUserId))
+	{
+		response_data["code"] = 106;
+		response_data["message"] = u8"对方暂时无法接收好友申请";
+		return response_data;
+	}
 	FriendRelation friendRelation;
 	FriendRelationDao friendRelationDao;
 	if (friendRelationDao.hasAcceptedRelation(fromUserId, toUserId))

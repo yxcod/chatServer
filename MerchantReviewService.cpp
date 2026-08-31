@@ -10,6 +10,7 @@
 
 #include "MerchantReviewDao.h"
 #include "MerchantReviewEntryModel.h"
+#include "UserBlockDao.h"
 
 namespace
 {
@@ -260,6 +261,9 @@ Json::Value MerchantReviewService::listEntries(
     const auto limit = std::max(1U, std::min(requestedLimit, 200U));
     try
     {
+        if (targetUserName != userName &&
+            UserBlockDao().isBlockedEitherDirection(userName, targetUserName))
+            return response(403, "Access denied by blacklist");
         const auto entries = MerchantReviewDao().listEntries(
             targetUserName, userName, limit);
         Json::Value items(Json::arrayValue);
@@ -283,6 +287,11 @@ Json::Value MerchantReviewService::setReaction(
     {
         const auto entryId = readUInt64(request["entryId"]);
         if (entryId == 0) return response(101, "Invalid entry id");
+        const auto owner = MerchantReviewDao().getOwnerUserName(entryId);
+        if (owner.empty()) return response(103, "Merchant review not found");
+        if (owner != userName &&
+            UserBlockDao().isBlockedEitherDirection(userName, owner))
+            return response(403, "Access denied by blacklist");
         const auto reaction = reactionValue(
             trim(request.get("reaction", "none").asString()));
         return successWithData(entryToJson(MerchantReviewDao().setReaction(
@@ -311,6 +320,11 @@ Json::Value MerchantReviewService::addComment(
         if (entryId == 0 || (content.empty() && imageName.empty()) ||
             utf8CharacterCount(content) > 500 || !safeImageName(imageName))
             return response(101, "Invalid comment");
+        const auto owner = MerchantReviewDao().getOwnerUserName(entryId);
+        if (owner.empty()) return response(103, "Merchant review not found");
+        if (owner != userName &&
+            UserBlockDao().isBlockedEitherDirection(userName, owner))
+            return response(403, "Access denied by blacklist");
         return successWithData(entryToJson(MerchantReviewDao().addComment(
             entryId, userName, content, imageName, currentTimeMillis())));
     }

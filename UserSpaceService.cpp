@@ -9,6 +9,7 @@
 
 #include "SpaceGuestbookMessageModel.h"
 #include "UserSpaceDao.h"
+#include "UserBlockDao.h"
 
 namespace
 {
@@ -84,6 +85,9 @@ Json::Value UserSpaceService::detail(const std::string& userName,
     const auto limit = std::max(1U, std::min(requestedLimit, 100U));
     try
     {
+        if (owner != userName &&
+            UserBlockDao().isBlockedEitherDirection(userName, owner))
+            return response(403, "Access denied by blacklist");
         const auto space = UserSpaceDao().getSpace(owner);
         const auto messages = UserSpaceDao().listMessages(owner, limit);
         Json::Value messageItems(Json::arrayValue);
@@ -135,6 +139,9 @@ Json::Value UserSpaceService::addMessage(const std::string& userName,
         return response(101, "Invalid space message");
     try
     {
+        if (owner != userName &&
+            UserBlockDao().isBlockedEitherDirection(userName, owner))
+            return response(403, "Access denied by blacklist");
         return successWithData(messageToJson(UserSpaceDao().addMessage(
             owner, userName, content, currentTimeMillis())));
     }

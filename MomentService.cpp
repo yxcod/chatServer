@@ -12,6 +12,7 @@
 #include "MomentDao.h"
 #include "MomentMediaModel.h"
 #include "MomentModel.h"
+#include "UserBlockDao.h"
 
 namespace
 {
@@ -290,6 +291,11 @@ Json::Value MomentService::userList(const std::string& userName,
 
     try
     {
+        if (authorUserName != userName &&
+            UserBlockDao().isBlockedEitherDirection(userName, authorUserName))
+        {
+            return response(403, "Access denied by blacklist");
+        }
         const auto beforeMomentId = readUInt64(request["beforeMomentId"]);
         const auto requestedLimit = request.get("limit", 30).asUInt();
         const auto limit = requestedLimit < 1U
@@ -321,6 +327,11 @@ Json::Value MomentService::toggleLike(const std::string& userName,
     {
         const auto momentId = readUInt64(request["momentId"]);
         if (momentId == 0) return response(101, "Invalid moment id");
+        const auto author = MomentDao().getAuthorUserName(momentId);
+        if (author.empty()) return response(103, "Moment not found");
+        if (author != userName &&
+            UserBlockDao().isBlockedEitherDirection(userName, author))
+            return response(403, "Access denied by blacklist");
         return successWithData(momentToJson(MomentDao().toggleLike(
             momentId, userName, currentTimeMillis())));
     }
@@ -342,6 +353,11 @@ Json::Value MomentService::addComment(const std::string& userName,
         {
             return response(101, "Invalid comment");
         }
+        const auto author = MomentDao().getAuthorUserName(momentId);
+        if (author.empty()) return response(103, "Moment not found");
+        if (author != userName &&
+            UserBlockDao().isBlockedEitherDirection(userName, author))
+            return response(403, "Access denied by blacklist");
         return successWithData(momentToJson(MomentDao().addComment(
             momentId, userName, content, currentTimeMillis())));
     }

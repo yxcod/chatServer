@@ -169,6 +169,11 @@
     <ClCompile Include="FriendRelationService.cpp">
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
+    <ClCompile Include="UserBlockDao.cpp" />
+    <ClCompile Include="UserBlockModel.cpp" />
+    <ClCompile Include="UserBlockService.cpp">
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="GroupChatDao.cpp" />
     <ClCompile Include="GroupConversationDao.cpp" />
     <ClCompile Include="GroupMemberDao.cpp" />
@@ -259,6 +264,10 @@
     <ClInclude Include="FriendRelationDao.h" />
     <ClInclude Include="FriendRelationModel.h" />
     <ClInclude Include="FriendRelationService.h" />
+    <ClInclude Include="UserBlockController.h" />
+    <ClInclude Include="UserBlockDao.h" />
+    <ClInclude Include="UserBlockModel.h" />
+    <ClInclude Include="UserBlockService.h" />
     <ClInclude Include="GroupChatDao.h" />
     <ClInclude Include="GroupChatModel.h" />
     <ClInclude Include="GroupController.h" />

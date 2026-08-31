@@ -534,3 +534,16 @@ void MomentDao::lockVisibleMoment(
         throw std::runtime_error("Moment not found or not visible");
     }
 }
+
+std::string MomentDao::getAuthorUserName(std::uint64_t momentId) const
+{
+    auto connection = DatabaseConnectionPool::instance().acquire();
+    std::unique_ptr<sql::PreparedStatement> statement(
+        connection->prepareStatement(
+            "SELECT authorUserName FROM moment WHERE momentId = ? AND status = 0 LIMIT 1"));
+    statement->setUInt64(1, momentId);
+    std::unique_ptr<sql::ResultSet> result(statement->executeQuery());
+    return result->next()
+        ? result->getString("authorUserName").asStdString()
+        : std::string();
+}

@@ -45,6 +45,10 @@
     <ClInclude Include="FriendRelationModel.h">
       <Filter>源文件\Model</Filter>
     </ClInclude>
+    <ClInclude Include="UserBlockModel.h"><Filter>源文件\Model</Filter></ClInclude>
+    <ClInclude Include="UserBlockDao.h"><Filter>源文件\Mapper</Filter></ClInclude>
+    <ClInclude Include="UserBlockService.h"><Filter>源文件\Service</Filter></ClInclude>
+    <ClInclude Include="UserBlockController.h"><Filter>源文件\Control</Filter></ClInclude>
     <ClInclude Include="ChatRecoedModel.h">
       <Filter>源文件\Model</Filter>
     </ClInclude>
@@ -210,6 +214,9 @@
     <ClCompile Include="FriendRelationModel.cpp">
       <Filter>源文件\Model</Filter>
     </ClCompile>
+    <ClCompile Include="UserBlockModel.cpp"><Filter>源文件\Model</Filter></ClCompile>
+    <ClCompile Include="UserBlockDao.cpp"><Filter>源文件\Mapper</Filter></ClCompile>
+    <ClCompile Include="UserBlockService.cpp"><Filter>源文件\Service</Filter></ClCompile>
     <ClCompile Include="ChatServer.cpp">
       <Filter>源文件\main</Filter>
     </ClCompile>
