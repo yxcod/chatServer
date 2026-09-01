@@ -86,15 +86,16 @@ MomentModel MomentDao::createMoment(
             std::unique_ptr<sql::PreparedStatement> mediaStatement(
                 connection->prepareStatement(
                     "INSERT INTO momentMedia "
-                    "(momentId, mediaType, mediaUrl, sortOrder, createdAt) "
-                    "VALUES (?, ?, ?, ?, ?)"));
+                    "(momentId, mediaType, mediaUrl, thumbnailUrl, sortOrder, createdAt) "
+                    "VALUES (?, ?, ?, NULLIF(?, ''), ?, ?)"));
             for (const auto& mediaItem : media)
             {
                 mediaStatement->setUInt64(1, momentId);
                 mediaStatement->setUInt(2, mediaItem.getMediaType());
                 mediaStatement->setString(3, mediaItem.getMediaUrl());
-                mediaStatement->setUInt(4, mediaItem.getSortOrder());
-                mediaStatement->setUInt64(5, mediaItem.getCreatedAt());
+                mediaStatement->setString(4, mediaItem.getThumbnailUrl());
+                mediaStatement->setUInt(5, mediaItem.getSortOrder());
+                mediaStatement->setUInt64(6, mediaItem.getCreatedAt());
                 mediaStatement->executeUpdate();
             }
         }
@@ -322,12 +323,17 @@ std::vector<std::string> MomentDao::deleteMoment(
         std::vector<std::string> mediaUrls;
         std::unique_ptr<sql::PreparedStatement> mediaStatement(
             connection->prepareStatement(
-                "SELECT mediaUrl FROM momentMedia WHERE momentId = ?"));
+            "SELECT mediaUrl, thumbnailUrl FROM momentMedia WHERE momentId = ?"));
         mediaStatement->setUInt64(1, momentId);
         std::unique_ptr<sql::ResultSet> media(mediaStatement->executeQuery());
         while (media->next())
         {
             mediaUrls.push_back(media->getString("mediaUrl").asStdString());
+            if (!media->isNull("thumbnailUrl"))
+            {
+                const auto thumbnail = media->getString("thumbnailUrl").asStdString();
+                if (!thumbnail.empty()) mediaUrls.push_back(thumbnail);
+            }
         }
 
         // Break possible reply-to-comment references before removing all

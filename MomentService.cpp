@@ -112,11 +112,19 @@ Json::Value momentToJson(const MomentModel& moment)
     value["createdAt"] = Json::UInt64(moment.getCreatedAt());
 
     Json::Value media(Json::arrayValue);
+    Json::Value mediaItems(Json::arrayValue);
     for (const auto& item : moment.getMedia())
     {
         media.append(item.getMediaUrl());
+        Json::Value mediaItem(Json::objectValue);
+        mediaItem["url"] = item.getMediaUrl();
+        mediaItem["type"] = item.getMediaType() == 1 ? "video" : "image";
+        if (!item.getThumbnailUrl().empty())
+            mediaItem["thumbnailUrl"] = item.getThumbnailUrl();
+        mediaItems.append(std::move(mediaItem));
     }
     value["mediaPaths"] = std::move(media);
+    value["mediaItems"] = std::move(mediaItems);
 
     Json::Value comments(Json::arrayValue);
     for (const auto& comment : moment.getComments())
@@ -268,12 +276,21 @@ Json::Value MomentService::publish(const std::string& userName,
             return response(101, "At most 9 media files are allowed");
         }
         std::uint16_t sortOrder = 0;
-        for (const auto& mediaUrl : mediaUrls)
+        for (const auto& mediaValue : mediaUrls)
         {
-            const std::string url = mediaUrl.asString();
+            const std::string url = mediaValue.isObject()
+                ? mediaValue.get("url", "").asString()
+                : mediaValue.asString();
+            const std::string thumbnailUrl = mediaValue.isObject()
+                ? mediaValue.get("thumbnailUrl", "").asString()
+                : std::string();
             if (url.empty() || url.size() > 1024)
             {
                 return response(101, "Invalid media URL");
+            }
+            if (thumbnailUrl.size() > 1024)
+            {
+                return response(101, "Invalid media thumbnail URL");
             }
             MomentMediaModel item;
             const std::string lowerUrl = toLower(url);
@@ -283,6 +300,7 @@ Json::Value MomentService::publish(const std::string& userName,
                 lowerUrl.find(".m4v") != std::string::npos;
             item.setMediaType(isVideo ? 1 : 0);
             item.setMediaUrl(url);
+            if (isVideo) item.setThumbnailUrl(thumbnailUrl);
             item.setSortOrder(sortOrder++);
             media.push_back(std::move(item));
         }
