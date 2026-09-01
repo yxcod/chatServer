@@ -55,7 +55,7 @@ int UserInfoDao::insertUserInfo(const UserInfo& userInfo)
         pstmt->setString(6, userInfo.getSignature());
         pstmt->setUInt64(7, userInfo.getCreateTime());
         pstmt->setInt(8, userInfo.getState());
-        pstmt->setInt(9, userInfo.getModifyTime());
+        pstmt->setUInt64(9, userInfo.getModifyTime());
         return pstmt->executeUpdate();
     }
     catch (...)
