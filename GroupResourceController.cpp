@@ -16,6 +16,7 @@
 namespace
 {
 constexpr std::size_t kMaxPhotoBytes = 5ULL * 1024 * 1024;
+constexpr std::size_t kMaxAlbumVideoBytes = 300ULL * 1024 * 1024;
 constexpr std::size_t kMaxFileBytes = 300ULL * 1024 * 1024;
 const std::filesystem::path kResourceRoot = "./groupResourceData";
 std::atomic<std::uint64_t> sequence{0};
@@ -78,6 +79,12 @@ std::string mimeFor(const std::string& name, std::string_view data)
     return "application/octet-stream";
 }
 
+bool isAlbumMime(const std::string& mime)
+{
+    return mime.rfind("image/", 0) == 0 || mime == "video/mp4" ||
+        mime == "video/quicktime";
+}
+
 Json::Value toJson(const GroupResourceModel& item, const std::string& viewer,
                    bool manager)
 {
@@ -114,15 +121,22 @@ void GroupResourceController::upload(const drogon::HttpRequestPtr& req,
     const auto& file = parser.getFiles().front();
     const auto originalName = file.getFileName();
     const auto size = file.fileLength();
-    const auto limit = type == 2 ? kMaxPhotoBytes : kMaxFileBytes;
-    if (!safeOriginalName(originalName) || size == 0 || size > limit)
+    if (!safeOriginalName(originalName) || size == 0)
     {
-        callback(reply(413, type == 2 ? "Photo exceeds 5MB" : "File exceeds 300MB", drogon::k413RequestEntityTooLarge)); return;
+        callback(reply(400, "Invalid file", drogon::k400BadRequest)); return;
     }
     const auto mime = mimeFor(originalName, file.fileContent());
-    if (type == 2 && mime.rfind("image/", 0) != 0)
+    if (type == 2 && !isAlbumMime(mime))
     {
-        callback(reply(415, "Album only accepts JPEG, PNG or WebP", drogon::k415UnsupportedMediaType)); return;
+        callback(reply(415, "Album only accepts JPEG, PNG, WebP, MP4, M4V or MOV", drogon::k415UnsupportedMediaType)); return;
+    }
+    const auto limit = type == 1 ? kMaxFileBytes :
+        (mime.rfind("video/", 0) == 0 ? kMaxAlbumVideoBytes : kMaxPhotoBytes);
+    if (size > limit)
+    {
+        callback(reply(413, mime.rfind("video/", 0) == 0 ?
+            "Video exceeds 300MB" : "Photo exceeds 5MB",
+            drogon::k413RequestEntityTooLarge)); return;
     }
     auto extension = lower(std::filesystem::path(originalName).extension().string());
     if (extension.size() > 12 || !std::all_of(extension.begin() + (extension.empty() ? 0 : 1), extension.end(), [](unsigned char ch) { return std::isalnum(ch) != 0; })) extension.clear();

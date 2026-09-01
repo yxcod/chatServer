@@ -30,7 +30,7 @@ public:
 private:
     std::uint64_t resourceId_{0};
     std::uint64_t groupId_{0};
-    std::uint8_t resourceType_{0}; // 1-file/video, 2-photo
+    std::uint8_t resourceType_{0}; // 1-file, 2-album photo/video
     std::string originalName_;
     std::string storedName_;
     std::string mimeType_;
