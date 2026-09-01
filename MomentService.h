@@ -13,4 +13,7 @@ public:
     Json::Value toggleLike(const std::string& userName, const Json::Value& request) const;
     Json::Value addComment(const std::string& userName, const Json::Value& request) const;
     Json::Value deleteMoment(const std::string& userName, const Json::Value& request) const;
+    Json::Value notifications(const std::string& userName, const Json::Value& request) const;
+    Json::Value notificationUnreadCount(const std::string& userName, const Json::Value& request) const;
+    Json::Value markNotificationsRead(const std::string& userName, const Json::Value& request) const;
 };

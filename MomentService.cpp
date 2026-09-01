@@ -12,6 +12,10 @@
 #include "MomentDao.h"
 #include "MomentMediaModel.h"
 #include "MomentModel.h"
+#include "MomentNotificationDao.h"
+#include "MomentNotificationModel.h"
+#include "ChatManageController.h"
+#include "JPushService.h"
 #include "UserBlockDao.h"
 
 namespace
@@ -121,6 +125,56 @@ Json::Value momentToJson(const MomentModel& moment)
     }
     value["comments"] = std::move(comments);
     return value;
+}
+
+Json::Value notificationToJson(const MomentNotificationModel& notification)
+{
+    Json::Value value(Json::objectValue);
+    value["notificationId"] = Json::UInt64(notification.getNotificationId());
+    value["actorUserId"] = notification.getActorUserName();
+    value["actorName"] = notification.getActorNickName();
+    value["actorAvatarUrl"] = notification.getActorAvatar();
+    value["momentId"] = Json::UInt64(notification.getMomentId());
+    value["interactionType"] = notification.getInteractionType() == 1
+        ? "like" : "comment";
+    value["commentContent"] = notification.getCommentContent();
+    value["isRead"] = notification.isRead();
+    value["createdAt"] = Json::UInt64(notification.getCreatedAt());
+    if (notification.getReadAt() > 0)
+        value["readAt"] = Json::UInt64(notification.getReadAt());
+    else
+        value["readAt"] = Json::Value();
+    return value;
+}
+
+void dispatchMomentNotification(const MomentNotificationModel& notification,
+                                unsigned int unreadCount)
+{
+    Json::Value event = notificationToJson(notification);
+    event["unreadCount"] = unreadCount;
+    ChatWSServer::notifyMomentInteraction(
+        notification.getRecipientUserName(), event);
+
+    const bool isLike = notification.getInteractionType() == 1;
+    const std::string actorName = notification.getActorNickName().empty()
+        ? notification.getActorUserName()
+        : notification.getActorNickName();
+    Json::Value extras(Json::objectValue);
+    extras["eventType"] = "momentInteraction";
+    extras["momentId"] = Json::UInt64(notification.getMomentId());
+    extras["interactionType"] = isLike ? "like" : "comment";
+    extras["notificationId"] = Json::UInt64(notification.getNotificationId());
+    extras["actorUserId"] = notification.getActorUserName();
+    extras["actorName"] = actorName;
+    JPushService::pushToUsers(
+        {notification.getRecipientUserName()},
+        isLike ? actorName + u8"\u70b9\u8d5e\u4e86\u4f60\u7684\u52a8\u6001"
+               : actorName + u8"\u8bc4\u8bba\u4e86\u4f60\u7684\u52a8\u6001",
+        isLike ? u8"\u67e5\u770b\u52a8\u6001\u4e92\u52a8"
+               : notification.getCommentContent(),
+        extras,
+        false,
+        false);
 }
 
 bool isSafeMediaName(const std::string& value)
@@ -332,8 +386,25 @@ Json::Value MomentService::toggleLike(const std::string& userName,
         if (author != userName &&
             UserBlockDao().isBlockedEitherDirection(userName, author))
             return response(403, "Access denied by blacklist");
-        return successWithData(momentToJson(MomentDao().toggleLike(
-            momentId, userName, currentTimeMillis())));
+        const auto now = currentTimeMillis();
+        const auto updated = MomentDao().toggleLike(momentId, userName, now);
+        if (author != userName && updated.isLikedByViewer())
+        {
+            try
+            {
+                MomentNotificationDao notificationDao;
+                const auto notification = notificationDao.create(
+                    author, userName, momentId, 1, "", now);
+                dispatchMomentNotification(
+                    notification, notificationDao.unreadCount(author));
+            }
+            catch (const std::exception& error)
+            {
+                std::cerr << "Create moment-like notification failed: "
+                          << error.what() << '\n';
+            }
+        }
+        return successWithData(momentToJson(updated));
     }
     catch (const std::exception& error)
     {
@@ -358,8 +429,26 @@ Json::Value MomentService::addComment(const std::string& userName,
         if (author != userName &&
             UserBlockDao().isBlockedEitherDirection(userName, author))
             return response(403, "Access denied by blacklist");
-        return successWithData(momentToJson(MomentDao().addComment(
-            momentId, userName, content, currentTimeMillis())));
+        const auto now = currentTimeMillis();
+        const auto updated = MomentDao().addComment(
+            momentId, userName, content, now);
+        if (author != userName)
+        {
+            try
+            {
+                MomentNotificationDao notificationDao;
+                const auto notification = notificationDao.create(
+                    author, userName, momentId, 2, content, now);
+                dispatchMomentNotification(
+                    notification, notificationDao.unreadCount(author));
+            }
+            catch (const std::exception& error)
+            {
+                std::cerr << "Create moment-comment notification failed: "
+                          << error.what() << '\n';
+            }
+        }
+        return successWithData(momentToJson(updated));
     }
     catch (const std::exception& error)
     {
@@ -385,5 +474,71 @@ Json::Value MomentService::deleteMoment(const std::string& userName,
     {
         std::cerr << "Delete moment failed: " << error.what() << '\n';
         return response(102, "Failed to delete moment");
+    }
+}
+
+Json::Value MomentService::notifications(const std::string& userName,
+                                         const Json::Value& request) const
+{
+    try
+    {
+        const auto beforeNotificationId = readUInt64(
+            request["beforeNotificationId"]);
+        const auto requestedLimit = request.get("limit", 30).asUInt();
+        const auto limit = requestedLimit < 1U
+            ? 1U : (requestedLimit > 50U ? 50U : requestedLimit);
+        MomentNotificationDao dao;
+        const auto notifications = dao.list(
+            userName, beforeNotificationId, limit);
+        Json::Value items(Json::arrayValue);
+        for (const auto& notification : notifications)
+            items.append(notificationToJson(notification));
+        Json::Value data(Json::objectValue);
+        data["items"] = std::move(items);
+        data["hasMore"] = notifications.size() == limit;
+        data["unreadCount"] = dao.unreadCount(userName);
+        return successWithData(std::move(data));
+    }
+    catch (const std::exception& error)
+    {
+        std::cerr << "Load moment notifications failed: " << error.what() << '\n';
+        return response(102, "Failed to load moment notifications");
+    }
+}
+
+Json::Value MomentService::notificationUnreadCount(
+    const std::string& userName,
+    const Json::Value&) const
+{
+    try
+    {
+        Json::Value data(Json::objectValue);
+        data["unreadCount"] = MomentNotificationDao().unreadCount(userName);
+        return successWithData(std::move(data));
+    }
+    catch (const std::exception& error)
+    {
+        std::cerr << "Load moment unread count failed: " << error.what() << '\n';
+        return response(102, "Failed to load moment unread count");
+    }
+}
+
+Json::Value MomentService::markNotificationsRead(
+    const std::string& userName,
+    const Json::Value&) const
+{
+    try
+    {
+        Json::Value data(Json::objectValue);
+        data["markedCount"] = MomentNotificationDao().markAllRead(
+            userName, currentTimeMillis());
+        data["unreadCount"] = 0;
+        return successWithData(std::move(data));
+    }
+    catch (const std::exception& error)
+    {
+        std::cerr << "Mark moment notifications read failed: "
+                  << error.what() << '\n';
+        return response(102, "Failed to mark moment notifications read");
     }
 }

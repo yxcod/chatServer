@@ -63,7 +63,9 @@ std::string compactJson(const Json::Value& value)
 void JPushService::pushToUsers(const std::vector<std::string>& userNames,
                                const std::string& title,
                                const std::string& body,
-                               const Json::Value& extras)
+                               const Json::Value& extras,
+                               bool allowSound,
+                               bool allowVibration)
 {
     if (userNames.empty() || body.empty()) return;
     const auto config = loadConfig();
@@ -90,8 +92,10 @@ void JPushService::pushToUsers(const std::vector<std::string>& userNames,
         if (!device.isBannerEnabled()) continue;
         if (uniqueIds.insert(device.getRegistrationId()).second)
             registrationIds.append(device.getRegistrationId());
-        soundEnabled = soundEnabled || device.isSoundEnabled();
-        vibrationEnabled = vibrationEnabled || device.isVibrationEnabled();
+        soundEnabled = soundEnabled ||
+            (allowSound && device.isSoundEnabled());
+        vibrationEnabled = vibrationEnabled ||
+            (allowVibration && device.isVibrationEnabled());
     }
     if (registrationIds.empty()) return;
 

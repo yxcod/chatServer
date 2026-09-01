@@ -531,6 +531,16 @@ void ChatWSServer::notifyAutomaticFriendGreeting(
     sendToUsers({recipientId}, event);
 }
 
+void ChatWSServer::notifyMomentInteraction(
+    const std::string& recipientId,
+    const Json::Value& notification)
+{
+    if (recipientId.empty() || !notification.isObject()) return;
+    Json::Value event = notification;
+    event["type"] = "momentInteraction";
+    sendToUsers({recipientId}, event);
+}
+
 void ChatWSServer::handleNewConnection(const HttpRequestPtr& req,
     const WebSocketConnectionPtr& conn)
 {

@@ -10,5 +10,7 @@ public:
     static void pushToUsers(const std::vector<std::string>& userNames,
                             const std::string& title,
                             const std::string& body,
-                            const Json::Value& extras = Json::Value());
+                            const Json::Value& extras = Json::Value(),
+                            bool allowSound = true,
+                            bool allowVibration = true);
 };

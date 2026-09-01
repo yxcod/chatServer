@@ -19,6 +19,9 @@ public:
         ADD_METHOD_TO(MomentController::toggleLike, "/api/moment/toggleLike", drogon::Post);
         ADD_METHOD_TO(MomentController::addComment, "/api/moment/comment", drogon::Post);
         ADD_METHOD_TO(MomentController::deleteMoment, "/api/moment/delete", drogon::Post);
+        ADD_METHOD_TO(MomentController::notifications, "/api/moment/notifications", drogon::Post);
+        ADD_METHOD_TO(MomentController::notificationUnreadCount, "/api/moment/notifications/unreadCount", drogon::Post);
+        ADD_METHOD_TO(MomentController::markNotificationsRead, "/api/moment/notifications/readAll", drogon::Post);
     METHOD_LIST_END
 
     void publish(const drogon::HttpRequestPtr& request,
@@ -55,6 +58,28 @@ public:
                       std::function<void(const drogon::HttpResponsePtr&)>&& callback)
     {
         handle(request, std::move(callback), &MomentService::deleteMoment);
+    }
+
+    void notifications(const drogon::HttpRequestPtr& request,
+                       std::function<void(const drogon::HttpResponsePtr&)>&& callback)
+    {
+        handle(request, std::move(callback), &MomentService::notifications);
+    }
+
+    void notificationUnreadCount(
+        const drogon::HttpRequestPtr& request,
+        std::function<void(const drogon::HttpResponsePtr&)>&& callback)
+    {
+        handle(request, std::move(callback),
+               &MomentService::notificationUnreadCount);
+    }
+
+    void markNotificationsRead(
+        const drogon::HttpRequestPtr& request,
+        std::function<void(const drogon::HttpResponsePtr&)>&& callback)
+    {
+        handle(request, std::move(callback),
+               &MomentService::markNotificationsRead);
     }
 
 private:

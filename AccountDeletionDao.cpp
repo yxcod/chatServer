@@ -103,6 +103,10 @@ AccountDeletionResult AccountDeletionDao::deleteAccount(
             "DELETE FROM pushDeviceRegistration WHERE userName = ?", userName);
 
         executeForUserTwice(*connection,
+            "DELETE FROM momentNotification "
+            "WHERE recipientUserName = ? OR actorUserName = ?", userName);
+
+        executeForUserTwice(*connection,
             "DELETE FROM momentLike WHERE userName = ? OR momentId IN "
             "(SELECT momentId FROM moment WHERE authorUserName = ?)", userName);
         executeForUserTwice(*connection,

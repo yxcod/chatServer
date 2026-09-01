@@ -339,7 +339,8 @@ std::vector<std::string> MomentDao::deleteMoment(
         clearReplies->setUInt64(1, momentId);
         clearReplies->executeUpdate();
 
-        const char* childTables[] = {"momentLike", "momentComment", "momentMedia"};
+        const char* childTables[] = {
+            "momentNotification", "momentLike", "momentComment", "momentMedia"};
         for (const char* table : childTables)
         {
             std::unique_ptr<sql::PreparedStatement> statement(

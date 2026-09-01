@@ -204,6 +204,7 @@
     <ClCompile Include="MerchantReviewDao.cpp" />
     <ClCompile Include="MerchantReviewService.cpp" />
     <ClCompile Include="MomentDao.cpp" />
+    <ClCompile Include="MomentNotificationDao.cpp" />
     <ClCompile Include="MomentService.cpp" />
     <ClCompile Include="ProxyController.cpp" />
     <ClCompile Include="PushDeviceController.cpp">
@@ -307,6 +308,8 @@
     <ClInclude Include="MomentLikeModel.h" />
     <ClInclude Include="MomentMediaModel.h" />
     <ClInclude Include="MomentModel.h" />
+    <ClInclude Include="MomentNotificationDao.h" />
+    <ClInclude Include="MomentNotificationModel.h" />
     <ClInclude Include="MomentService.h" />
     <ClInclude Include="ProxyController.h" />
     <ClInclude Include="RangeUtils.h" />

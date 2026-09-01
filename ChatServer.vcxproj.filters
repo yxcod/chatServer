@@ -84,6 +84,12 @@
     <ClInclude Include="MomentModel.h">
       <Filter>源文件\Model</Filter>
     </ClInclude>
+    <ClInclude Include="MomentNotificationDao.h">
+      <Filter>源文件\Mapper</Filter>
+    </ClInclude>
+    <ClInclude Include="MomentNotificationModel.h">
+      <Filter>源文件\Model</Filter>
+    </ClInclude>
     <ClInclude Include="MomentService.h" />
     <ClInclude Include="UserLoginService.h">
       <Filter>源文件\Service</Filter>
@@ -231,6 +237,7 @@
       <Filter>源文件\Model</Filter>
     </ClCompile>
     <ClCompile Include="MomentDao.cpp" />
+    <ClCompile Include="MomentNotificationDao.cpp"><Filter>源文件\Mapper</Filter></ClCompile>
     <ClCompile Include="MomentService.cpp" />
     <ClCompile Include="MerchantReviewDao.cpp"><Filter>源文件\Mapper</Filter></ClCompile>
     <ClCompile Include="MerchantReviewService.cpp"><Filter>源文件\Service</Filter></ClCompile>

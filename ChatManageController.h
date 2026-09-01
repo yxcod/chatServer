@@ -68,6 +68,10 @@ public:
         const std::string& recipientId,
         const Json::Value& greeting);
 
+    static void notifyMomentInteraction(
+        const std::string& recipientId,
+        const Json::Value& notification);
+
     // WebSocketController 接口实现
     void handleNewConnection(const HttpRequestPtr& req,
         const WebSocketConnectionPtr& conn) override;
