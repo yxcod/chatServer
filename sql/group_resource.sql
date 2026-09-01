@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS `groupResource` (
   `resourceType` TINYINT UNSIGNED NOT NULL COMMENT '1群文件/视频，2群相册照片',
   `originalName` VARCHAR(255) NOT NULL COMMENT '用户上传时的原始文件名',
   `storedName` VARCHAR(255) NOT NULL COMMENT '服务器实际存储文件名',
+  `coverStoredName` VARCHAR(255) NULL COMMENT '视频封面的服务器存储文件名',
   `mimeType` VARCHAR(128) NOT NULL DEFAULT 'application/octet-stream',
   `fileSize` BIGINT UNSIGNED NOT NULL DEFAULT 0,
   `uploaderId` VARCHAR(64) NOT NULL COMMENT '上传者账户',

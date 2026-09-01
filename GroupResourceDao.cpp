@@ -16,6 +16,8 @@ GroupResourceModel readResource(sql::ResultSet& result)
     item.setResourceType(static_cast<std::uint8_t>(result.getUInt("resourceType")));
     item.setOriginalName(result.getString("originalName").asStdString());
     item.setStoredName(result.getString("storedName").asStdString());
+    if (!result.isNull("coverStoredName"))
+        item.setCoverStoredName(result.getString("coverStoredName").asStdString());
     item.setMimeType(result.getString("mimeType").asStdString());
     item.setFileSize(result.getUInt64("fileSize"));
     item.setUploaderId(result.getString("uploaderId").asStdString());
@@ -29,15 +31,17 @@ std::uint64_t GroupResourceDao::insert(GroupResourceModel& resource) const
     auto connection = DatabaseConnectionPool::instance().acquire();
     std::unique_ptr<sql::PreparedStatement> statement(connection->prepareStatement(
         "INSERT INTO groupResource (groupId, resourceType, originalName, storedName, "
-        "mimeType, fileSize, uploaderId, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"));
+        "coverStoredName, mimeType, fileSize, uploaderId, createdAt) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"));
     statement->setUInt64(1, resource.getGroupId());
     statement->setUInt(2, resource.getResourceType());
     statement->setString(3, resource.getOriginalName());
     statement->setString(4, resource.getStoredName());
-    statement->setString(5, resource.getMimeType());
-    statement->setUInt64(6, resource.getFileSize());
-    statement->setString(7, resource.getUploaderId());
-    statement->setUInt64(8, resource.getCreatedAt());
+    statement->setString(5, resource.getCoverStoredName());
+    statement->setString(6, resource.getMimeType());
+    statement->setUInt64(7, resource.getFileSize());
+    statement->setString(8, resource.getUploaderId());
+    statement->setUInt64(9, resource.getCreatedAt());
     statement->executeUpdate();
     std::unique_ptr<sql::PreparedStatement> idStatement(connection->prepareStatement("SELECT LAST_INSERT_ID() AS id"));
     std::unique_ptr<sql::ResultSet> result(idStatement->executeQuery());
@@ -51,7 +55,7 @@ std::vector<GroupResourceModel> GroupResourceDao::list(std::uint64_t groupId,
 {
     auto connection = DatabaseConnectionPool::instance().acquire();
     std::unique_ptr<sql::PreparedStatement> statement(connection->prepareStatement(
-        "SELECT resourceId, groupId, resourceType, originalName, storedName, mimeType, "
+        "SELECT resourceId, groupId, resourceType, originalName, storedName, coverStoredName, mimeType, "
         "fileSize, uploaderId, createdAt FROM groupResource "
         "WHERE groupId = ? AND resourceType = ? AND isDeleted = 0 ORDER BY createdAt DESC"));
     statement->setUInt64(1, groupId);
@@ -66,7 +70,7 @@ std::optional<GroupResourceModel> GroupResourceDao::get(std::uint64_t resourceId
 {
     auto connection = DatabaseConnectionPool::instance().acquire();
     std::unique_ptr<sql::PreparedStatement> statement(connection->prepareStatement(
-        "SELECT resourceId, groupId, resourceType, originalName, storedName, mimeType, "
+        "SELECT resourceId, groupId, resourceType, originalName, storedName, coverStoredName, mimeType, "
         "fileSize, uploaderId, createdAt FROM groupResource "
         "WHERE resourceId = ? AND isDeleted = 0 LIMIT 1"));
     statement->setUInt64(1, resourceId);

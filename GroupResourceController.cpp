@@ -16,6 +16,7 @@
 namespace
 {
 constexpr std::size_t kMaxPhotoBytes = 5ULL * 1024 * 1024;
+constexpr std::size_t kMaxCoverBytes = 2ULL * 1024 * 1024;
 constexpr std::size_t kMaxAlbumVideoBytes = 300ULL * 1024 * 1024;
 constexpr std::size_t kMaxFileBytes = 300ULL * 1024 * 1024;
 const std::filesystem::path kResourceRoot = "./groupResourceData";
@@ -97,6 +98,7 @@ Json::Value toJson(const GroupResourceModel& item, const std::string& viewer,
     value["fileSize"] = Json::UInt64(item.getFileSize());
     value["uploaderId"] = item.getUploaderId();
     value["createdAt"] = Json::UInt64(item.getCreatedAt());
+    value["hasCover"] = !item.getCoverStoredName().empty();
     value["canDelete"] = manager || viewer == item.getUploaderId();
     return value;
 }
@@ -114,11 +116,40 @@ void GroupResourceController::upload(const drogon::HttpRequestPtr& req,
         callback(reply(403, "Not an active group member", drogon::k403Forbidden)); return;
     }
     drogon::MultiPartParser parser;
-    if (parser.parse(req) != 0 || parser.getFiles().size() != 1)
+    if (parser.parse(req) != 0 || parser.getFiles().empty() ||
+        parser.getFiles().size() > 2)
     {
-        callback(reply(400, "Exactly one file is required", drogon::k400BadRequest)); return;
+        callback(reply(400, "One media file and an optional JPEG cover are required",
+            drogon::k400BadRequest)); return;
     }
-    const auto& file = parser.getFiles().front();
+    const auto& files = parser.getFiles();
+    std::size_t mediaIndex = 0;
+    std::size_t coverIndex = files.size();
+    if (files.size() == 2)
+    {
+        const auto firstMime = mimeFor(files[0].getFileName(), files[0].fileContent());
+        const auto secondMime = mimeFor(files[1].getFileName(), files[1].fileContent());
+        if (firstMime.rfind("video/", 0) == 0 && secondMime == "image/jpeg")
+        {
+            mediaIndex = 0; coverIndex = 1;
+        }
+        else if (secondMime.rfind("video/", 0) == 0 && firstMime == "image/jpeg")
+        {
+            mediaIndex = 1; coverIndex = 0;
+        }
+        else
+        {
+            callback(reply(415, "A cover is only accepted as JPEG with a video",
+                drogon::k415UnsupportedMediaType)); return;
+        }
+        if (files[coverIndex].fileLength() == 0 ||
+            files[coverIndex].fileLength() > kMaxCoverBytes)
+        {
+            callback(reply(413, "Video cover exceeds 2MB",
+                drogon::k413RequestEntityTooLarge)); return;
+        }
+    }
+    const auto& file = files[mediaIndex];
     const auto originalName = file.getFileName();
     const auto size = file.fileLength();
     if (!safeOriginalName(originalName) || size == 0)
@@ -142,17 +173,31 @@ void GroupResourceController::upload(const drogon::HttpRequestPtr& req,
     if (extension.size() > 12 || !std::all_of(extension.begin() + (extension.empty() ? 0 : 1), extension.end(), [](unsigned char ch) { return std::isalnum(ch) != 0; })) extension.clear();
     const auto now = Logger::GetInstance().getcurrentTime();
     const auto storedName = std::to_string(now) + "_" + std::to_string(sequence.fetch_add(1)) + extension;
+    const auto coverStoredName = coverIndex < files.size() ?
+        std::to_string(now) + "_" + std::to_string(sequence.fetch_add(1)) + ".cover.jpg" :
+        std::string();
     const auto directory = kResourceRoot / std::to_string(groupId);
     const auto target = directory / storedName;
     const auto temporary = target.string() + ".uploading";
+    const auto coverTarget = coverStoredName.empty() ? std::filesystem::path() :
+        directory / coverStoredName;
+    const auto coverTemporary = coverStoredName.empty() ? std::string() :
+        coverTarget.string() + ".uploading";
     try
     {
         std::filesystem::create_directories(directory);
         if (file.saveAs(temporary) != 0) throw std::runtime_error("save failed");
         std::filesystem::rename(temporary, target);
+        if (coverIndex < files.size())
+        {
+            if (files[coverIndex].saveAs(coverTemporary) != 0)
+                throw std::runtime_error("cover save failed");
+            std::filesystem::rename(coverTemporary, coverTarget);
+        }
         GroupResourceModel resource;
         resource.setGroupId(groupId); resource.setResourceType(type);
         resource.setOriginalName(originalName); resource.setStoredName(storedName);
+        resource.setCoverStoredName(coverStoredName);
         resource.setMimeType(mime); resource.setFileSize(size);
         resource.setUploaderId(userName); resource.setCreatedAt(now);
         if (!GroupResourceDao().insert(resource)) throw std::runtime_error("database insert failed");
@@ -161,7 +206,11 @@ void GroupResourceController::upload(const drogon::HttpRequestPtr& req,
     }
     catch (const std::exception& error)
     {
-        std::error_code ignored; std::filesystem::remove(temporary, ignored); std::filesystem::remove(target, ignored);
+        std::error_code ignored;
+        std::filesystem::remove(temporary, ignored);
+        std::filesystem::remove(target, ignored);
+        if (!coverTemporary.empty()) std::filesystem::remove(coverTemporary, ignored);
+        if (!coverTarget.empty()) std::filesystem::remove(coverTarget, ignored);
         Logger::GetInstance().error(std::string("group resource upload failed: ") + error.what());
         callback(reply(500, "Upload failed", drogon::k500InternalServerError));
     }
@@ -205,6 +254,34 @@ void GroupResourceController::download(const drogon::HttpRequestPtr& req,
     catch (...) { callback(reply(500, "Download failed", drogon::k500InternalServerError)); }
 }
 
+void GroupResourceController::cover(const drogon::HttpRequestPtr& req,
+    std::function<void(const drogon::HttpResponsePtr&)>&& callback)
+{
+    const auto resourceId = uintValue(req->getParameter("resourceId"));
+    const auto userName = req->getParameter("userName");
+    try
+    {
+        const auto resource = GroupResourceDao().get(resourceId);
+        if (!resource || resource->getCoverStoredName().empty() ||
+            !GroupMemberDao().isUserInGroup(resource->getGroupId(), userName))
+        {
+            callback(reply(404, "Cover not found", drogon::k404NotFound)); return;
+        }
+        const auto path = kResourceRoot / std::to_string(resource->getGroupId()) /
+            resource->getCoverStoredName();
+        if (!std::filesystem::is_regular_file(path))
+        {
+            callback(reply(404, "Cover file not found", drogon::k404NotFound)); return;
+        }
+        auto response = drogon::HttpResponse::newFileResponse(
+            path.string(), "", drogon::CT_CUSTOM, "image/jpeg", req);
+        response->addHeader("Cache-Control", "private, max-age=31536000, immutable");
+        response->addHeader("X-Content-Type-Options", "nosniff");
+        callback(response);
+    }
+    catch (...) { callback(reply(500, "Cover download failed", drogon::k500InternalServerError)); }
+}
+
 void GroupResourceController::remove(const drogon::HttpRequestPtr& req,
     std::function<void(const drogon::HttpResponsePtr&)>&& callback)
 {
@@ -221,6 +298,9 @@ void GroupResourceController::remove(const drogon::HttpRequestPtr& req,
         if (!GroupResourceDao().markDeleted(resourceId, operatorId, Logger::GetInstance().getcurrentTime())) { callback(reply(409, "Already deleted", drogon::k409Conflict)); return; }
         std::error_code ignored;
         std::filesystem::remove(kResourceRoot / std::to_string(resource->getGroupId()) / resource->getStoredName(), ignored);
+        if (!resource->getCoverStoredName().empty())
+            std::filesystem::remove(kResourceRoot / std::to_string(resource->getGroupId()) /
+                resource->getCoverStoredName(), ignored);
         callback(reply(100, "success"));
     }
     catch (...) { callback(reply(500, "Delete failed", drogon::k500InternalServerError)); }
